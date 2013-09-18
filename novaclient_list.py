@@ -38,7 +38,7 @@ nt = client.Client(api, user, pword, tenant, os_auth_url)
 print
 print "Connected"
 print "FLAVORS=" + str(nt.flavors.list())
-print "SERVERS=" + str(nt.servers.list())
+print "INSTANCES(servers)=" + str(nt.servers.list())
 print "IMAGES=" + str(nt.images.list())
 print "KEYPAIRS=" + str(nt.keypairs.list())
 
