@@ -1,19 +1,35 @@
 #!/bin/bash
 
+##############################################################################
+# Description: Helper script to facilitate restarting of nova-api
+#              process on a DevStack installation
+#
+# TODO: Adapt to other proceses
+#
+
 VERBOSE=1
+
+# Location of nova-api script in my DevStack installation:
 BIN_DIR=/usr/local/bin
+
 LOG_DIR=/tmp
 
+########################################
+# Functions:
+
 PROG=$0
-die() {
-    echo "$PROG: die - $*" >&2
+# FATAL: Exit with error message and non-zero return code
+FATAL() {
+    echo "$PROG: FATAL - $*" >&2
     exit 1
 }
 
+# debug: Output debug messae if VERBOSE set to non-zero
 debug() {
-    echo "DEBUG: $*" >&2
+    [ $VERBOSE -ne 0 ] && echo "DEBUG: $*" >&2
 }
 
+# listprocs: List matching processes to stdout
 listprocs() {
     PROCESS=$1;shift
     #echo "getpids $PROCESS => " `ps -fade | grep $PROCESS | grep -v grep`
@@ -21,16 +37,17 @@ listprocs() {
     ps -fade | grep $PROCESS | grep -v grep
 }
 
+# getpids: Get pids of matching processes - echo to stdout
 getpids() {
     PROCESS=$1;shift
 
-    [ $VERBOSE -ne 0 ] &&
-        debug "getpids $PROCESS => " `ps -fade | grep $PROCESS | grep -v grep` 
+    debug "getpids $PROCESS => " `ps -fade | grep $PROCESS | grep -v grep` 
 
     PIDS=`ps -fade | grep $PROCESS | grep -v grep | awk '{print $2;}'`
     echo $PIDS
 }
 
+# restart_proc: Restart specified process (only works for nova-api for now)
 restart_proc() {
     PROCESS=$1;shift
     CHECK_URL=$1;shift
@@ -45,7 +62,8 @@ restart_proc() {
     fi
 }
 
-
+########################################
+# Main:
 echo
 echo "Checking for nova-api processes"
 NOVA_API_PIDS=`getpids nova-api`
@@ -59,7 +77,7 @@ if [ ! -z "$NOVA_API_PIDS" ];then
     echo
     echo "Checking there are no more nova-api processes"
     NOVA_API_PIDS=`getpids nova-api`
-    [ ! -z "$NOVA_API_PIDS" ] && die "Failed to kill nova-api processes" `VERBOSE=1 getpids`
+    [ ! -z "$NOVA_API_PIDS" ] && FATAL "Failed to kill nova-api processes" `VERBOSE=1 getpids`
 fi
 
 
