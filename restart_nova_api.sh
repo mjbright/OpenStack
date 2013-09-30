@@ -8,6 +8,7 @@
 #
 
 VERBOSE=1
+BACKGROUND=1
 
 # Location of nova-api script in my DevStack installation:
 BIN_DIR=/usr/local/bin
@@ -54,6 +55,13 @@ restart_proc() {
     TIMEOUT=60
 
     cd $BIN_DIR
+
+    # Start in foreground:
+    if [ $BACKGROUND -eq 0 ];then
+        ./$PROCESS
+        return
+    fi
+
     ./$PROCESS > /tmp/$PROCESS 2>&1 &
 
     if ! timeout $TIMEOUT sh -c "while ! wget --no-proxy -q -O- $CHECK_URL; do sleep 1; done"; then
@@ -61,6 +69,20 @@ restart_proc() {
         exit 1
     fi
 }
+
+########################################
+# Process cmd-line args:
+
+while [ ! -z "$1" ];do
+    case $1 in
+        -0) VERBOSE=0;;
+        -v) let VERBOSE=VERBOSE=1;;
+        -bg) BACKGROUND=1;;
+        -fg) BACKGROUND=0;;
+        *) die "Unknown option: $1";;
+    esac
+    shift
+done
 
 ########################################
 # Main:
