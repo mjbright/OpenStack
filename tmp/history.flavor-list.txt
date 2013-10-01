@@ -1,0 +1,141 @@
+    1  cat /etc/hosts
+    2  mkdir -p src/git
+    3  3cwcd
+    4  set -o vi
+    5  cd src/git
+    6  vi /home/mjb/.bashrc 
+    7  . /home/mjb/.bashrc 
+    8  sudo apt-get install git
+    9  vi ~/devstack.sh
+   10  chmod +x ~/devstack.sh
+   11  sudo ~/devstack.sh
+   12  vi ~/devstack.sh
+   13  sudo ~/devstack.sh
+   14  ps -fade
+   15  fg
+   16  sudo ~/devstack.sh
+   17  ll
+   18  cat devstack.sh 
+   19  cd src/git/devstack/
+   20  ll localrc 
+   21  ps -fade
+   22  ps -fade | less
+   23  ./stack.sh 
+   24  ll -a
+   25  ls
+   26  ls -a
+   27  sudo ./stack.sh 
+   28  ifconfig
+   29  sudo lightdm
+   30  sudo shutdown -h 0
+   31  cat /etc/passwd
+   32  grep stack /etc/passwd
+   33  ll
+   34  sudo apt-get install lightdm firefox xfce4 gnome-terminal
+   35  #sudo apt-get install lightdm firefox xfce4 gnome-terminal
+   36  vi .xsession
+   37  reboot
+   38  sudo reboot
+   39  ll
+   40  cd ~/src/git/OpenStack/
+   41  ll
+   42  . ../devstack/openrc 
+   43  ./novaclient_list.py 
+   44  #git rm MJ
+   45  ll ~/MJB.files.tar 
+   46  git rm MJB.files.tar 
+   47  git status
+   48  git status  -v
+   49  svn diff
+   50  git diff
+   51  git status
+   52  ll
+   53  git add novaclient_list.py
+   54  vi novaclient_list.py
+   55  git push
+   56  git status
+   57  git loh
+   58  git log
+   59  git commit
+   60  git status
+   61  git add novaclient_list.py
+   62  git status
+   63  git commit -m "First checkin of simple novaclient to list flavours/images/instances"
+   64  git push
+   65  git status
+   66  ./novaclient_list.py 
+   67  ll
+   68  vi novaclient_list.py
+   69  ./novaclient_list.py 
+   70  git commit -a -m "Changed message to say INSTANCES(servers) as I think in instances ..."
+   71  git config --global user.name mjbright
+   72  git config --global user.email github@mjbright.net
+   73  git push
+   74  git status
+   75  git log
+   76  ./novaclient_list.py 
+   77  vi novaclient_list.py
+   78  ./novaclient_list.py 
+   79  vi novaclient_list.py
+   80  ./novaclient_list.py 
+   81  vi novaclient_list.py
+   82  ./novaclient_list.py 
+   83  vi novaclient_list.py
+   84  ./novaclient_list.py 
+   85  vi novaclient_list.py
+   86  ./novaclient_list.py 
+   87  vi novaclient_list.py
+   88  ./novaclient_list.py 
+   89  git commit -m "Cleaned up client code - added comments/reduced imports to minimum needed"
+   90  git push
+   91  nova flavors-list
+   92  nova help
+   93  nova flavor-list
+   94  nova flavor help
+   95  nova help flavor
+   96  nova help | grep flavor
+   97  nova flavor-list
+   98  nova flavor-delete 1
+   99  . ../devstack/openrc admin
+  100  nova flavor-delete 1
+  101  nova flavor-list
+  102  nova flavor-create
+  103  nova help flavor-create
+  104  nova flavor-list
+  105  nova flavor-create 'm1.tiny' 1 64 10 1
+  106  nova flavor-list
+  107  nova flavor-delete 1
+  108  nova flavor-list
+  109  nova flavor-create 'm1.test' 1 65 11 3
+  110  nova flavor-list
+  111  history
+  112  nova flavor-list
+  113  nova show
+  114  nova list
+  115  ./novaclient_list.py 
+  116  nova list
+  117  nova flavor-list
+  118  nova list
+  119  nova help | grep list
+  120  nova list
+  121  env | grep OS
+  122  . ../devstack/openrc 
+  123  nova list
+  124  env | grep OS
+  125  . ../devstack/openrc demo
+  126  nova list
+  127  ./novaclient_list.py 
+  128  nova list
+  129  vi ../devstack/openrc 
+  130  . ../devstack/openrc demo demo
+  131  nova list
+  132  . ../devstack/openrc admin demo
+  133  nova list
+  134  nova show test1
+  135  nova show test1_2
+  136  nova flavor-list
+  137  nova show test1_2
+  138  history
+  139  history | grep stack
+  140  history
+  141  history > ~/history.flavor-list.txt

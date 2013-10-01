@@ -1,0 +1,172 @@
+    1  cat /etc/hosts
+    2  mkdir -p src/git
+    3  3cwcd
+    4  set -o vi
+    5  cd src/git
+    6  vi /home/mjb/.bashrc 
+    7  . /home/mjb/.bashrc 
+    8  sudo apt-get install git
+    9  vi ~/devstack.sh
+   10  chmod +x ~/devstack.sh
+   11  sudo ~/devstack.sh
+   12  vi ~/devstack.sh
+   13  sudo ~/devstack.sh
+   14  ps -fade
+   15  fg
+   16  sudo ~/devstack.sh
+   17  ll
+   18  cat devstack.sh 
+   19  cd src/git/devstack/
+   20  ll localrc 
+   21  ps -fade
+   22  ps -fade | less
+   23  ./stack.sh 
+   24  ll -a
+   25  ls
+   26  ls -a
+   27  sudo ./stack.sh 
+   28  ifconfig
+   29  sudo lightdm
+   30  sudo shutdown -h 0
+   31  sudo apt-get install firefox
+   32  vi test.py
+   33  python test.py
+   34  vi test.py
+   35  ./test.py
+   36  chmod +x test.py 
+   37  ./test.py 
+   38  vi test.py
+   39  ./test.py 
+   40  vi test.py
+   41  ./test.py 
+   42  vi test.py
+   43  ./test.py 
+   44  vi test.py
+   45  ./test.py 
+   46  vi test.py
+   47  ./test.py 
+   48  vi test.py
+   49  ./test.py 
+   50  env | grep URL
+   51  . ./src/git/devstack/openrc 
+   52  env | grep URL
+   53  ./test.py 
+   54  vi test.py
+   55  ./test.py 
+   56  vi test.py
+   57  ./test.py 
+   58  vi test.py
+   59  ./test.py 
+   60  vi test.py
+   61  ./test.py 
+   62  vi test.py
+   63  ./test.py 
+   64  vi test.py
+   65  ./test.py 
+   66  vi test.py
+   67  ./test.py 
+   68  vi test.py
+   69  ./test.py 
+   70  vi test.py
+   71  ./test.py 
+   72  env | grep OS)
+   73  env | grep OS_
+   74  vi test.py
+   75  ./test.py 
+   76  vi test.py
+   77  ./test.py 
+   78  vi test.py 
+   79  ./test.py 
+   80  vi test.py 
+   81  bpython 
+   82  pwd
+   83  ll -tr
+   84  vi test.py 
+   85  ll /home/mjb/test.py 
+   86  vi test.py 
+   87  ./test.py 
+   88  vi test.py 
+   89  ./test.py 
+   90  vi test.py 
+   91  ./test.py 
+   92  locate api.py
+   93  locate compute/api.py
+   94  vi /opt/stack/nova/nova/compute/api.py
+   95  grep -ir "but already used" /opt/stack/nova/nova/compute
+   96  grep -ir "but already used" /opt/stack/nova/nova/
+   97  grep -ir "but already used" /opt/stack/nova/nova/ | grep .py:
+   98  grep -nir "but already used" /opt/stack/nova/nova/ | grep .py:
+   99  vi /opt/stack/nova/nova/exception.py
+  100  vi /opt/stack/nova/nova/compute/api.py
+  101  grep -c TooMany /opt/stack/nova/nova/compute/api.py
+  102  grep -n TooMany /opt/stack/nova/nova/compute/api.py
+  103  vi /opt/stack/nova/nova/compute/api.py
+  104  ll -tr
+  105  mv test.py novaclient_list.py
+  106  cp -a novaclient_list.py novaclient_create.py 
+  107  vi novaclient_create.py 
+  108  chmod +x novaclient_create.py 
+  109  ./novaclient_create.py 
+  110  vi novaclient_create.py 
+  111  ./novaclient_create.py 
+  112  vi novaclient_create.py 
+  113  ./novaclient_create.py 
+  114  vi novaclient_create.py 
+  115  ./novaclient_create.py 
+  116  vi novaclient_create.py 
+  117  ./novaclient_create.py 
+  118  vi novaclient_create.py 
+  119  ./novaclient_create.py 
+  120  pwd
+  121  vi src/git/devstack/localrc 
+  122  ll src/git/devstack/localrc 
+  123  sudo vi src/git/devstack/localrc 
+  124  ll /opt/stack/
+  125  ll /opt/stack/data/
+  126  ll /opt/stack/data/nova/
+  127  ll /opt/stack/status/
+  128  ll /opt/stack/status/stack/
+  129  sudo vi src/git/devstack/localrc 
+  130  mkdir /tmp/screen.logs
+  131  type -p screen
+  132  screen -ls
+  133  sudo screen -ls
+  134  sudo -u stack screen -ls
+  135  screen -x stack
+  136  sudo screen -x stack
+  137  sudo -u stack screen -x stack
+  138  #ll /opt/stack/nova/nova/
+  139  cd src/git/devstack/
+  140  ll
+  141  . openrc admin
+  142  keystone tenant-list
+  143  nova quota
+  144  nova quota-list
+  145  nova
+  146  nova | grep -i quota
+  147  nova quota show
+  148  nova quota-show
+  149  keystone tenant-list
+  150  nova quota-update --instances 2 fd2a3b69bf58463ab48beb8ad81eff5d
+  151  nova quota-show
+  152  . openrc
+  153  vi /opt/stack/nova/nova/compute/api.py
+  154  diff /tmp/api.py /opt/stack/nova/nova/compute/api.py
+  155  cp /opt/stack/nova/nova/compute/api.py /tmp/api.0.py
+  156  cp /tmp/api.py /opt/stack/nova/nova/compute/api.py
+  157  sudo cp /tmp/api.py /opt/stack/nova/nova/compute/api.py
+  158  ll -tr
+  159  ll -tr ~/
+  160  ~/novaclient_create.py 
+  161  vi ~/novaclient_create.py 
+  162  #cp -a nova
+  163  ll -tr ~/novaclient_create.py 
+  164  vi ~/novaclient_create.py 
+  165  cp -a ~/novaclient_create.py  ~/novaclient_create.1.py
+  166  ~/novaclient_create.py 4
+  167  vi ~/novaclient_create.py 
+  168  ~/novaclient_create.py 4
+  169  vi ~/novaclient_create.py 
+  170  ~/novaclient_create.py 4
+  171  history > LOG1
+  172  history > ~/LOG1
