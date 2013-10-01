@@ -5,6 +5,33 @@ NOVA_CONF_ORIG=/etc/nova/nova.conf.orig
 QUOTA_CORES_LINE=quota_cores=-1
 QUOTA_INSTANCES_LINE=quota_instances=20
 
+##############################################################################
+# Functions:
+
+PROG=$0
+# FATAL: Exit with error message and non-zero return code
+FATAL() {
+    echo "$PROG: FATAL - $*" >&2
+    exit 1
+}
+
+##############################################################################
+# Cmd-line args: TODO
+
+while [ ! -z "$1" ];do
+    case $1 in
+#        -0) VERBOSE=0;;
+#        -v) let VERBOSE=VERBOSE=1;;
+#        #-bg) BACKGROUND=1;;
+#        #-fg) BACKGROUND=0;;
+        *) FATAL "Unknown option: $1";;
+    esac
+    shift
+done
+
+##############################################################################
+# Main:
+
 [ ! -f $NOVA_CONF_ORIG ] && cp $NOVA_CONF $NOVA_CONF_ORIG
 
 diff $NOVA_CONF $NOVA_CONF_ORIG
