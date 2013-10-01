@@ -79,7 +79,7 @@ while [ ! -z "$1" ];do
         -v) let VERBOSE=VERBOSE=1;;
         -bg) BACKGROUND=1;;
         -fg) BACKGROUND=0;;
-        *) die "Unknown option: $1";;
+        *) FATAL "Unknown option: $1";;
     esac
     shift
 done
