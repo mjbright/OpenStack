@@ -58,11 +58,11 @@ restart_proc() {
 
     # Start in foreground:
     if [ $BACKGROUND -eq 0 ];then
-        ./$PROCESS
+        sudo -u stack ./$PROCESS
         return
     fi
 
-    ./$PROCESS > /tmp/$PROCESS 2>&1 &
+    sudo -u stack ./$PROCESS > /tmp/$PROCESS 2>&1 &
 
     if ! timeout $TIMEOUT sh -c "while ! wget --no-proxy -q -O- $CHECK_URL; do sleep 1; done"; then
         echo "$PROCESS did not start after $TIMEOUT secs"
