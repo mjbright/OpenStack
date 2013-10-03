@@ -9,6 +9,9 @@ MY_FLAVOR=myflav
 MY_FLAVOR_ID=20
 MY_FLAVOR_ARGS="64 0 2"
 
+# Override:
+#MY_FLAVOR=m1.tiny
+
 VERBOSE=1
 BACKGROUND=1
 
@@ -28,35 +31,43 @@ debug() {
 }
 
 restart_nova_api() {
+    debug "$SCRIPTS_DIR/restart_nova_api.sh"
     $SCRIPTS_DIR/restart_nova_api.sh
 }
 
 set_nova_conf() {
+    debug "$SCRIPTS_DIR/insert_lines_into_nova.conf.sh"
     $SCRIPTS_DIR/insert_lines_into_nova.conf.sh
 }
 
 normal_user() {
+    debug ". $DEVSTACK_DIR/openrc"
     . $DEVSTACK_DIR/openrc
 }
 
 admin_user() {
+    debug ". $DEVSTACK_DIR/openrc admin"
     . $DEVSTACK_DIR/openrc admin
 }
 
 create_flavor() {
     nova flavor-list
     #nova flavor-create 'm1.tiny' 20 64 0 1 # id RAM disk vcpus
+    debug "nova flavor-create $MY_FLAVOR $MY_FLAVOR_ID $MY_FLAVOR_ARGS"
     nova flavor-create $MY_FLAVOR $MY_FLAVOR_ID $MY_FLAVOR_ARGS
     nova flavor-list
 }
 
 create_1image() {
+    debug "nova boot --image $IMAGE --flavor $MY_FLAVOR_ID testg1"
     nova boot --image $IMAGE --flavor $MY_FLAVOR_ID testg1
     nova list
 }
 
-create_12images() {
-    nova boot --image $IMAGE --num-instances 12 --flavor $MY_FLAVOR_ID testg12
+create_Nimages() {
+    NUM=$1
+    debug "nova boot --image $IMAGE --num-instances $NUM --flavor $MY_FLAVOR_ID testg$NUM"
+    nova boot --image $IMAGE --num-instances $NUM --flavor $MY_FLAVOR_ID testg$NUM
     nova list
 }
 
@@ -85,10 +96,13 @@ done
 ## fi
 
 #kill_devstack
-#normal_user
-admin_user
-#create_flavor
-create_1image
+normal_user
+#admin_user
+
+#[ "$MY_FLAVOR" != "m1.tiny" ] && create_flavor
+#[ ${MY_FLAVOR#m1.} != $MY_FLAVOR ] && echo "m1.xx => $MY_FLAVOR"
+[ ${MY_FLAVOR#m1.} != $MY_FLAVOR ] && create_flavor
+create_Nimages 12
 
 exit 0
 
