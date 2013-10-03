@@ -58,11 +58,11 @@ restart_proc() {
 
     # Start in foreground:
     if [ $BACKGROUND -eq 0 ];then
-        sudo -u stack ./$PROCESS
+        ./$PROCESS
         return
     fi
 
-    sudo -u stack ./$PROCESS > /tmp/$PROCESS 2>&1 &
+    ./$PROCESS > /tmp/$PROCESS 2>&1 &
 
     if ! timeout $TIMEOUT sh -c "while ! wget --no-proxy -q -O- $CHECK_URL; do sleep 1; done"; then
         echo "$PROCESS did not start after $TIMEOUT secs"
@@ -72,6 +72,8 @@ restart_proc() {
 
 ########################################
 # Process cmd-line args:
+
+[ `id -un` = "root" ] && FATAL "Must be run as non-root user"
 
 while [ ! -z "$1" ];do
     case $1 in
