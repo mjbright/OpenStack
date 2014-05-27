@@ -1,0 +1,91 @@
+
+# Get Nth table column value from 1st line matching value
+#    grepGetArgN 'regex' 'pos'
+grepGetArgN() {
+    GREP="$1";         shift
+    OSTK_ARG_POS="$1"; shift
+
+    #awk "/$GREP/ { print \$$OSTK_ARG_POS; }"
+    perl -ne "
+        if (/$GREP/) {
+            \$POS=1+2*($OSTK_ARG_POS-1);
+            @WORDS=split(/\\s+/, \$_);
+            print \$WORDS[\$POS];
+        }"
+}
+
+# Get Nth table column value from 1st line
+#    grepGetArgN 'pos'
+getArgN() {
+    OSTK_ARG_POS="$1"; shift
+
+    #let AWK_POS=1+2*(OSTK_ARG_POS-1)
+
+    #head -4 | tail -1 | awk "/^/ { print \$$OSTK_ARG_POS; }"
+    LINE_NO=4 # 1st-entry
+
+    perl -ne "
+        if (\$. == $LINE_NO) {
+            \$POS=1+2*($OSTK_ARG_POS-1);
+            @WORDS=split(/\\s+/, \$_);
+            print \$WORDS[\$POS];
+        };"
+}
+
+getFloatingIP() {
+    POOL="$1"
+    #nova --insecure floating-ip-create "Erxternal Network" | getArgN 1
+    nova --insecure floating-ip-create "$POOL" | getArgN 1
+}
+
+getInstanceId() {
+    NAME="$1"
+
+    nova --insecure list | grepGetArgN "$NAME" 1
+}
+
+
+getInstanceName() {
+    NAME="$1"
+
+    nova --insecure list | grepGetArgN "$NAME" 2
+}
+
+getGlanceImageId() {
+    NAME="$1"
+
+    glance --insecure image-list | grepGetArgN "$NAME" 1
+}
+
+
+getGlanceImageName() {
+    NAME="$1"
+
+    glance --insecure image-list | grepGetArgN "$NAME" 2
+}
+
+getGlanceImageDiskFormat() {
+    NAME="$1"
+
+    glance --insecure image-list | grepGetArgN "$NAME" 3
+}
+
+getGlanceImageContainerFormat() {
+    NAME="$1"
+
+    glance --insecure image-list | grepGetArgN "$NAME" 4
+}
+
+getGlanceImageSize() {
+    NAME="$1"
+
+    glance --insecure image-list | grepGetArgN "$NAME" 5
+}
+
+getGlanceImageStatus() {
+    NAME="$1"
+
+    glance --insecure image-list | grepGetArgN "$NAME" 6
+}
+
+
