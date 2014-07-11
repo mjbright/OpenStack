@@ -47,10 +47,11 @@ It can be used as:
     ./auto_helion.sh -2
 
     # STEP3: Will create, or re-create, the Seed VM:
+    #        Takes under 5 min (seed: Gen5, baremetal nodes: Gen8)
     ./auto_helion.sh -3
 
     # STEP4: Will perform the installation:
-    # To be described:
+    #        Takes under 60 min (seed: Gen5, baremetal nodes: Gen8)
     ./auto_helion.sh -4
 
 
