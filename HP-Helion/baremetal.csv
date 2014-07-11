@@ -1,0 +1,5 @@
+00:17:21:77:3C:18  ,ilouser,ilopassword,iloipaddress1,2,131072,550
+00:17:21:77:3C:1C,ilouser,ilopassword  ,iloipaddress2,2,131072,550
+00:17:21:77:3C:0C,ilouser,ilopassword,  iloipaddress3,2  ,262144,550
+00:17:21:77:3C:10,  ilouser,ilopassword,iloipaddress4,2,262144,550
+00:17:21:77:3C:14,ilouser,ilopassword,iloipaddress5,2,262144,550
