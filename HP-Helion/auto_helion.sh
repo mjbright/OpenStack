@@ -4,6 +4,11 @@ IP=10.3.3.117
 IP=10.3.160.10
 SEEDHOST=seedhost
 
+export NODE_MIN_DISK=512
+
+export FLOATING_PREFIX=10.3.160
+export FLOATING_PREFIX=192.0.2
+
 #IP=10.3.160.199
 USER=user
 LOGIN=${USER}@${IP}
@@ -76,7 +81,48 @@ yesno() {
     done
 }
 
+create_seedvm_ssh_config() {
+    die "DISABLED"
+    #cat >seedvm_ssh.config <<EOF
+#
+#Host seedvm
+#    HostName 192.0.2.1
+#    User root
+#    StrictHostKeyChecking no
+#    UserKnownHostsFile /dev/null
+#Host under
+#    HostName 192.0.2.2
+#    User root
+## #    StrictHostKeyChecking no
+## #    UserKnownHostsFile /dev/null
+#
+#EOF
+}
+
 create_seedvm_env_sh() {
+
+    echo "CREATE undercloud.sh"
+    cat >undercloud.sh <<EOF
+
+echo "\$0: \$*"
+
+if [ "\$1" = "--novalist" ];then
+    exec ssh -t heat-admin@192.0.2.2 "sudo su - -c '. /root/stackrc; nova list'"
+fi
+
+if [ "\$1" = "--over-nova-ip" ];then
+    ID=\$(ssh -t heat-admin@192.0.2.2 "sudo su - -c '. /root/stackrc; nova list'" | grep NovaCompute0 | awk '{print \$2;}')
+    echo ID=\$ID
+    exec ssh -t heat-admin@192.0.2.2 "sudo su - -c '. /root/stackrc; nova show \$ID'"
+fi
+
+echo "[\$(hostname) \$(id)] executing command '\$@'"
+#OK: ssh -t heat-admin@192.0.2.2 "sudo su - -c 'hostname'"
+ssh -t heat-admin@192.0.2.2 "sudo -- sh -c '\$@'"
+
+EOF
+
+    echo "CREATE seedvm_env.sh"
     cat >seedvm_env.sh <<EOF
 
 export OVERCLOUD_NTP_SERVER=10.3.252.26
@@ -85,9 +131,12 @@ export UNDERCLOUD_NTP_SERVER=10.3.252.26
 export OVERCLOUD_NeutronPublicInterface=eth0
 export UNDERCLOUD_NeutronPublicInterface=eth0
 
-export FLOATING_START=10.3.160.45
-export FLOATING_END=10.3.160.254
-export FLOATING_CIDR=10.3.160.0/24
+#export FLOATING_START=10.3.160.45
+#export FLOATING_END=10.3.160.254
+#export FLOATING_CIDR=10.3.160.0/24
+export FLOATING_START=${FLOATING_PREFIX}.45
+export FLOATING_END=${FLOATING_PREFIX}.254
+export FLOATING_CIDR=${FLOATING_PREFIX}.0/24
 
 export OVERCLOUD_COMPUTESCALE=1
 
@@ -112,10 +161,11 @@ export UNDERCLOUD_STACK_TIMEOUT=240 # instead of default 60
 #UNDERCLOUD_STACK_TIMEOUT=\${UNDERCLOUD_STACK_TIMEOUT:-60}
 #wait_for_stack_ready \$((\$UNDERCLOUD_STACK_TIMEOUT * 60 / 10)) 10 undercloud
 
-bash -x /root/tripleo/tripleo-incubator/scripts/hp_ced_installer.sh
+bash -x /root/tripleo/tripleo-incubator/scripts/hp_ced_installer.sh \$*
 
 EOF
     #chmod a+x seedvm_env.sh
+    echo DONE
 }
 
 testPing() {
@@ -154,8 +204,20 @@ checkNetworkOnNode() {
 vmCommand() {
     [ $DEBUG_VM -ne 0 ] && echo "ssh -t $LOGIN sudo ssh $VM_LOGIN \
         $*"
-    ssh -t $LOGIN sudo ssh $VM_LOGIN $*
+    ssh -t $LOGIN sudo ssh -t $VM_LOGIN "\"$*\""
+    #ssh -t $LOGIN sudo ssh $VM_LOGIN $*
     #ssh -t $LOGIN sudo ssh $VM_LOGIN bash -c "$*"
+}
+
+undercloudCommand() {
+    #vmCommand bash -x /home/heat-admin/undercloud.sh "$@"
+    #vmCommand bash -x ./undercloud.sh "$@"
+    #vmCommand "./undercloud.sh $@"
+    vmCommand ./undercloud.sh "$@"
+}
+
+A_undercloudCommand() {
+    vmCommand ssh -t heat-admin@192.0.2.2 "$@"
 }
 
 STEP0() {
@@ -187,8 +249,8 @@ STEP0() {
 }
 
 STEP1() {
-    pause "Copy Helion archive file and baremetal.csv to seedhost '$SEEDHOST'"
-    rsync -av --progress /e/z/Downloads/hp_helion_openstack_community_baremetal.tgz baremetal.csv $SEEDHOST:
+    pause "Copy Helion archive file to seedhost '$SEEDHOST'"
+    rsync -av --progress /e/z/Downloads/hp_helion_openstack_community_baremetal.tgz $SEEDHOST:
 }
 
 STEP2() {
@@ -275,7 +337,7 @@ setBootToPXE() {
     echo
 }
 
-turnOffStrictHostKeyCheckingForSeedHost() {
+BAD_turnOffStrictHostKeyCheckingForSeedHost() {
     #Host seedvm
     #HostName 192.0.2.1
     #User root
@@ -286,22 +348,53 @@ turnOffStrictHostKeyCheckingForSeedHost() {
     #exit 0
 }
 
+STEP4u() {
+    export BM_NETWORK_SEED_IP=192.0.2.1
+    export OVERCLOUD_NeutronPublicInterface="eth0"
+    OPTS="--skip-seed"
+
+    time vmCommand "bash -x ./seedvm_env.sh $OPTS 2>&1" | tee ./hp_ced_installer.sh.log
+    showSeedTime "Finished[STEP4u] - exit code=$?"
+}
+
+STEP4o() {
+    export BM_NETWORK_SEED_IP=192.0.2.1
+    export OVERCLOUD_NeutronPublicInterface="eth0"
+    OPTS="--skip-seed --skip-undercloud"
+
+    time vmCommand "bash -x ./seedvm_env.sh $OPTS 2>&1" | tee ./hp_ced_installer.sh.log
+    showSeedTime "Finished[STEP4o] - exit code=$?"
+}
+
+transferFiles() {
+    echo "Creating files ..."
+    create_seedvm_env_sh
+    ls -altr seedvm_env.sh
+    #ssh-keygen -R root@192.0.2.1 
+
+    echo "Copying baremetal.csv to seedhost '$SEEDHOST':"
+    rsync -av --progress baremetal.csv $SEEDHOST:
+    #pause "Copy baremetal.csv to seedhost '$SEEDHOST'"
+
+    echo "Transferring files ... to seedvm:"
+
+    #ssh $LOGIN "sudo ssh $VM_LOGIN 'mkdir /root/.ssh; cat > /root/.ssh/config'" < seedvm_ssh.config
+    ssh $LOGIN "sudo ssh $VM_LOGIN 'cat > seedvm_env.sh'" < seedvm_env.sh
+    ssh $LOGIN "sudo ssh $VM_LOGIN 'cat > baremetal.csv'" < baremetal.csv
+    ssh $LOGIN "sudo ssh $VM_LOGIN 'cat > undercloud.sh'" < undercloud.sh
+    ssh $LOGIN "sudo ssh $VM_LOGIN 'chmod +x undercloud.sh'"
+}
+
 STEP4() {
     ## turnOffStrictHostKeyCheckingForSeedHost
     checkMachinesAreOff
     setBootToPXE
 
-    create_seedvm_env_sh
-
-    ls -altr seedvm_env.sh
-    #ssh-keygen -R root@192.0.2.1 
-
-    ssh $LOGIN "sudo ssh $VM_LOGIN 'cat > seedvm_env.sh'" < seedvm_env.sh
-    ssh $LOGIN "sudo ssh $VM_LOGIN 'cat > baremetal.csv'" < baremetal.csv
+    transferFiles
 
     #vmCommand "source  seedvm_env.sh; env; env | grep OVER"
-    time vmCommand "bash -x ./seedvm_env.sh 2>&1" | tee ./hp_ced_installer.sh.log
-    showSeedTime "Finished - exit code=$?"
+    time vmCommand "bash -x /root/seedvm_env.sh 2>&1" | tee ./hp_ced_installer.sh.log
+    showSeedTime "Finished[STEP4] - exit code=$?"
 }
 
 waitForSeedVMToShutOff() {
@@ -327,9 +420,29 @@ STEP_BAD() {
     virsh start seed
 }
 
+################################################################################
+# Testing routines:
+
 TEST() {
     echo "vmCommand uptime"
     vmCommand uptime
+}
+
+TEST_REMOTE_COMMANDS() {
+    # WORKS: both commands execute on seedvm: (\; necessary for 2nd):
+    # vmCommand "ls -altr /var/log/upstart/os-collect-config.log\; hostname";
+
+    # FAILS: hostname OK, following commands after logout:
+    # vmCommand "hostname;cd;ls -altr /var/log/upstart/os-collect-config.log; hostname";
+
+    # WORKS: all commands execute on seedvm: (\; necessary for 2nd ...):
+    vmCommand "hostname\;cd\;ls -altr /var/log/upstart/os-collect-config.log\; hostname";
+
+    # WORKS: all commands execute on seedvm: (\; necessary for 2nd ...):
+    vmCommand "hostname\;cd\; ls -altr /var/log/upstart/os-collect-config.log\; hostname";
+
+    # FAILS: hostname OK, following commands after logout:
+    # vmCommand "hostname\;cd; ls -altr /var/log/upstart/os-collect-config.log; hostname";
 }
 
 ################################################################################
@@ -352,7 +465,63 @@ while [ ! -z "$1" ];do
         -2) STEP2;;
         -3) STEP3;;
         -4) STEP4;;
+        -4u) STEP4u;;
+        -4o) STEP4o;;
         -5) STEP5;;
+
+        # tail log on seedvm:
+        #NOTE: ; closes connection!
+        --vmlog) vmCommand "tail -200f /var/log/upstart/os-collect-config.log";;
+        # backslashing ; is ok:
+        #-vmlog) vmCommand "cd\;tail -200f /var/log/upstart/os-collect-config.log";;
+
+        # login to seedhost:
+        #--seed) shift; ssh -t $LOGIN sudo "\"$*\""
+        --seed) shift; [ -z "$1" ] && set -- bash; ssh -t $LOGIN "\"$*\"";;
+        --seedroot) shift; [ -z "$1" ] && set -- bash; ssh -t $LOGIN "sudo '$*'";;
+        #--seedroot) shift; [ -z "$1" ] && set -- bash; ssh -t $LOGIN "sudo sh -- '$*'";;
+        #--seedroot) shift; ssh -t $LOGIN "sudo sh -- '$*'";;
+
+        # login to seedvm:
+        --vm) shift; vmCommand $*;;
+
+        # login to undercloud:
+        --under) shift; undercloudCommand "$*";;
+        --underroot) undercloudCommand "sudo sh -";;
+        #-under) shift; vmCommand ssh -t heat-admin@192.0.2.2 "$*";;
+        #-underroot) vmCommand ssh -t heat-admin@192.0.2.2 "sudo sh -";;
+
+        # do nova list from seedvm of undercloud:
+        --underlist) vmCommand sudo su - -c "bash -c 'id; hostname; id; cd /root/; . stackrc; nova list'";;
+
+        # do nova list from undercloud of overcloud:
+        --tfr) transferFiles;;
+        --over-nova-ip)
+            transferFiles;
+            undercloudCommand --over-nova-ip;
+            ;;
+        --overlist)
+            transferFiles;
+            #undercloudCommand --novalist;
+            undercloudCommand ". /root/stackrc\; nova list";
+            ;;
+
+        #--over) undercloudCommand  ssh overcloud ????;;
+
+        #--overlist) vmCommand ssh -t heat-admin@192.0.2.2 sudo su - -c "bash -c 'hostname; hostname; id; hostname; id; ip a; ls -altr /root; source /root/stackrc && nova list'";;
+
+        #--overlist) vmCommand ssh -t heat-admin@192.0.2.2 sudo su - -c "bash -c 'hostname; id; hostname; id; ip a; ls -altr /root; source /root/stackrc && nova list'";;
+
+
+        #--overlist) vmCommand ssh -t heat-admin@192.0.2.2 "sudo sh - -c 'bash -c \"source /root/stackrc && nova list\"'";;
+        #--overlist) vmCommand ssh -t heat-admin@192.0.2.2 "sudo sh - -c 'source /root/stackrc && nova list'";;
+        -underck) vmCommand ssh -t heat-admin@192.0.2.2 "sudo bash -c 'hostname; ip a; ls -altr /root; cksum /root/stackrc'";;
+        -underrc) vmCommand ssh -t heat-admin@192.0.2.2 "sudo bash -c 'hostname; ip a; ls -altr /root; source /root/stackrc && env | grep OS_'";;
+
+        #--overcloud) vmCommand ssh -t heat-admin@192.0.2.2 "source stackrc && nova list";;
+        --overcloud) vmCommand ssh -t heat-admin@192.0.2.2 ". stackrc && nova list";;
+
+        -t1) TEST_REMOTE_COMMANDS;;
         -t) TEST;;
         *) die "Unknown option '$1'";;
     esac
