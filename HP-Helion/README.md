@@ -92,5 +92,10 @@ To perform any other action:
 e.g. to set all nodes to PXE boot mode:
     ./ipmitools.sh -a chassis bootdev pxe
 
+GET_LOGS.sh
+--------------
+
+TO BE DONE: Document this new script
+
 
 
