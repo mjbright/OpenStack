@@ -4,7 +4,8 @@ HP Helion OpenStack - related tools
 
 These are largely untested tools to facilitate installation of HP Helion OpenStack.
 
-Currently being tested with the June 2014 Community Edition release for Baremetal installations.
+Currently being tested with the October 2014 "HP Helion OpenStack" GA release v1.0
+for Baremetal installations.
 
 baremetal.csv
 --------------
@@ -17,44 +18,54 @@ This is just a template, you'll need to put your
    - IP adress of your ilo interface
    - cpu,RAM,disk
 
-auto_helion.sh
+INSTALLER.sh
 --------------
 
 This script is a wrapper to automate the installation.
-
-It assumes you have installed Ubuntu on your seed host (physical machine).
-It will install the necessary packages and restart libvirt-bin.
+It is to be run from your seedhost as root user
+(the script should be configured with the seedhost and VM ip address
+ and will detect if not run from root@seedhost)
 
 It has been tested on Ubuntu 14.04 only.
-auto_helion.sh will login to the seedhost and perform actions from there.
-
-Note you will need to add an entry in your local ~/.ssh/config file to refer to your seedhost:
-    Host seedhost
-        HostName BAREMETAL_SEED_IP
-        User user
 
 The auto_helion.sh will use the ipmitools.sh script combined with your baremetal.csv file
 to auto power up/power down your baremetal nodes.
 
-It can be used as:
-    # Checks connectivity and sets up auto-login to your seedhost:
-    ./auto_helion.sh -0
+TO BE DONE: Document this new script
 
-    # Copies files to the seedhost: (your baremetal.csv and the 4.5GBy Helion distribution)
-    ./auto_helion.sh -1
+    # Reinitializes networking/destroys the SEED VM/Creates the SEED VM:
+    ./INSTALLER.sh -1
 
-    # Installs required Ubuntu packages
-    ./auto_helion.sh -2
+    # Runs the installer
+    ./INSTALLER.sh -2
 
-    # STEP3: Will create, or re-create, the Seed VM:
-    #        Takes under 5 min (seed: Gen5, baremetal nodes: Gen8)
-    ./auto_helion.sh -3
+TOOLS.sh
+----------
 
-    # STEP4: Will perform the installation:
-    #        Takes under 60 min (seed: Gen5, baremetal nodes: Gen8)
-    ./auto_helion.sh -4
+This script is a wrapper to facilitate connections to the different nodes.
+It is to be run from your seedhost as root user
+(the script should be configured with the seedhost and VM ip address
+ and will detect if not run from root@seedhost)
 
+TO BE DONE: Document this new script
 
+    # Show the credentials to connect to Undercloud Horizon dashboard as admin:
+    ./TOOLS.sh -uc
+
+    # Connect to the Undercloud node as heat-admin user:
+    ./TOOLS.sh -ucssh
+    ./TOOLS.sh -ucssh uptime
+
+    # List the Overcloud nodes
+    # Show the credentials to connect to Overcloud Horizon dashboard as admin:
+    ./TOOLS.sh -oc
+
+    # Connect to the 1st Overcloud node (in above list) as heat-admin user:
+    ./TOOLS.sh -ocssh 1
+    ./TOOLS.sh -ocssh 1 uptime
+
+    # Connect to the each Overcloud node and perform specified command (e.g. uptime)
+    ./TOOLS.sh -ocssh uptime
 
 
 ipmitool.sh
@@ -67,14 +78,15 @@ This script will read the entries in your baremetal.csv
 
 To check the power status of your nodes:
     ./ipmitools.sh 
+    ./ipmitools.sh +v # quiet mode: Don't echo commands
 
-To check power down all your nodes:
+To power down all your nodes:
     ./ipmitools.sh -off
 
-To check power up all your nodes:
+To power up all your nodes:
     ./ipmitools.sh -on
 
-To check perform any other action:
+To perform any other action:
     ./ipmitools.sh -a  <action>
 
 e.g. to set all nodes to PXE boot mode:
