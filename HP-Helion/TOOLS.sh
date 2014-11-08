@@ -266,7 +266,13 @@ undercloudLastLog() {
 tailDhcpLogging() {
     #ssh -t $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCP|dnsmasq'"
     #ssh -t $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCP|DHCPOFFER|DHCPREQUEST'"
-    ssh -t $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCPOFFER|DHCPREQUEST'"
+    while true; do
+        echo ""; echo ""; echo "";
+        echo "Following DHCP info in $VM_LOGIN:/var/log/syslog"
+        ssh -t $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCPOFFER|DHCPREQUEST'"
+        sleep 10
+        echo "Lost connection ... retrying ..."
+    done
 }
 
 ########################################
