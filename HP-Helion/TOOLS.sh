@@ -136,11 +136,6 @@ sedIP() {
     sed -e 's/.*ctlplane=//' -e 's/ .*//'
 }
 
-undercloudSSH() {
-    getUndercloudIP;
-    ssh -t $VM_LOGIN "ssh heat-admin@${UCIP} $*";
-}
-
 getUC_OC_LOGSandCONFIG() {
     die "TODO"
 }
@@ -151,6 +146,36 @@ overcloudSCPfrom() {
     TO=$1; shift;
 
 
+}
+
+showOvercloudNodes() {
+    ssh -t $VM_LOGIN ". stackrc;\
+echo "Undercloud nodes[nova list]:";\
+nova list"
+
+    undercloudRootSSH ". stackrc;\
+echo "Overcloud nodes[nova list]:";\
+nova list;\
+echo "Overcloud nodes[ironic node-list]:";\
+ironic node-list;\
+echo "Overcloud nodes[ironic port-list]:";\
+ironic port-list"
+}
+
+overcloudAPI() {
+    undercloudRootSSH ". overcloud.stackrc; $*"
+}
+
+undercloudRootSSH() {
+    getUndercloudIP;
+    #ssh -t $VM_LOGIN "ssh -t heat-admin@${UCIP} 'sudo su -'";
+    [ -z "$1" ] && set -- bash
+    ssh -t $VM_LOGIN "ssh -t heat-admin@${UCIP} 'sudo su - -c \"$*\"'";
+}
+
+undercloudSSH() {
+    getUndercloudIP;
+    ssh -t $VM_LOGIN "ssh heat-admin@${UCIP} $*";
 }
 
 overcloudSSH() {
@@ -238,6 +263,12 @@ undercloudLastLog() {
     ssh -t $VM_LOGIN "ssh heat-admin@${UCIP} sudo tail -${LINES}${FOLLOW} $LASTLOG"
 }
 
+tailDhcpLogging() {
+    #ssh -t $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCP|dnsmasq'"
+    #ssh -t $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCP|DHCPOFFER|DHCPREQUEST'"
+    ssh -t $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCPOFFER|DHCPREQUEST'"
+}
+
 ########################################
 #
 
@@ -265,6 +296,13 @@ while [ ! -z "$1" ] ;do
         -ucls) undercloudNovaList; exit 0;;
         -ucip) getUndercloudIP; exit 0;;
         -ucssh) shift; undercloudSSH $*; exit 0;;
+        -ucr|-ucrssh) shift; undercloudRootSSH $*; exit 0;;
+
+        -uapi) shift; undercloudAPI $*; exit 0;;
+        -api) shift; overcloudAPI $*; exit 0;;
+        -nodes) shift; showOvercloudNodes $*; exit 0;;
+
+        -dhcp) shift; tailDhcpLogging; exit 0;;
 
         -uclogs) shift; undercloudLsLogs; exit 0;;
         -uclog) shift; undercloudLog; exit 0;;
@@ -272,6 +310,7 @@ while [ ! -z "$1" ] ;do
 
         -ocip) shift; getOvercloudIP $1; exit 0;;
         -ocssh) shift; overcloudSSH $*; exit 0;;
+        -ocr) shift; overcloudRootSSH $*; exit 0;;
         -oc) overcloudCredentials; exit 0;;
         -oclist) overcloudNovaList; exit 0;;
         -ocboot)
