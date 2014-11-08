@@ -269,7 +269,18 @@ tailDhcpLogging() {
     while true; do
         echo ""; echo ""; echo "";
         echo "Following DHCP info in $VM_LOGIN:/var/log/syslog"
-        ssh -t $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCPOFFER|DHCPREQUEST'"
+        ssh -t -o StrictHostKeyChecking=no $VM_LOGIN "tail -100f /var/log/syslog | grep -E 'DHCPOFFER|DHCPREQUEST'"
+        sleep 10
+        echo "Lost connection ... retrying ..."
+    done
+}
+
+pingGW() {
+    # Ping BM network gateway from seedhost:
+    while true; do
+        echo ""; echo ""; echo "";
+        echo "Pinging [from $VM_LOGIN] baremetal network gateway $GW"
+        ssh -t -o StrictHostKeyChecking=no $VM_LOGIN "ping $GW"
         sleep 10
         echo "Lost connection ... retrying ..."
     done
@@ -309,6 +320,7 @@ while [ ! -z "$1" ] ;do
         -nodes) shift; showOvercloudNodes $*; exit 0;;
 
         -dhcp) shift; tailDhcpLogging; exit 0;;
+        -pinggw) shift; pingGW; exit 0;;
 
         -uclogs) shift; undercloudLsLogs; exit 0;;
         -uclog) shift; undercloudLog; exit 0;;
