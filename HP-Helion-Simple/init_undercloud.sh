@@ -5,7 +5,7 @@ set -o nounset # Force error on unset variables
 . ./VARS
 
 SCRIPTS_DIR=/root/tripleo/tripleo-incubator/scripts
-JSON_DIR=/root/tripleo/config
+JSON_DIR=/root/tripleo/configs
 JSON_FILE=kvm-custom-ips.json
 
 #SRCDIR=/root

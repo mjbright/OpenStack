@@ -92,7 +92,7 @@ checkVersion() {
 }
 
 sourceVariables() {
-    JSON_DIR=/root/tripleo/config
+    JSON_DIR=/root/tripleo/configs
     JSON_FILE=kvm-custom-ips.json
 
     case "$BUILD" in
