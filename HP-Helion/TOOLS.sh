@@ -1,4 +1,13 @@
 
+die() {
+    echo "$0: die - $*" >&2
+    exit 1
+}
+
+#env | grep -E "FLOATING|OVERCLOUD|UNDERCLOUD" &&
+env | grep -E "BM_|FLOATING|OVERCLOUD|UNDERCLOUD|SEED" &&
+    die "Careful - Helion variables seem to already be set"
+
 . VARS
 
 PROMPTS=1
@@ -12,7 +21,14 @@ ENVRC=$CONFIG_DIR/${envrc}
 BM_CSV=$CONFIG_DIR/baremetal.csv
 #BM_CSV=/home/user/baremetal.eth0.csv
 
-########################################
+[ ! -f $ENVRC ] && die "No such file as '$ENVRC'"
+#pause "Sourcing $ENVRC [ NOTE: you might consider a login/logout first ]"
+. $ENVRC
+
+#echo VM_LOGIN=$VM_LOGIN
+#exit 0
+
+#######################################
 #
 
 press() {
@@ -23,11 +39,6 @@ press() {
         [ "$_dummy" = "q" ] && exit 0;
         [ "$_dummy" = "Q" ] && exit 0;
     }
-}
-
-die() {
-    echo "$0: die - $*" >&2
-    exit 1
 }
 
 showSEEDVMIP() {
@@ -284,9 +295,6 @@ pingGW() {
 
 [ -z "$1" ] && set -- -np -12
 #[ -z "$1" ] && die "Missing argument"
-
-env | grep -E "BM_|FLOATING|OVERCLOUD|UNDERCLOUD|SEED" &&
-    die "Careful - Helion variables seem to already be set"
 
 ACTION=""
 ACTION_ARGS=""

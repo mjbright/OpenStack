@@ -1,13 +1,4 @@
 
-SEEDSUB=10.3.160
-SEEDHOST=${SEEDSUB}.10
-VM_IP=${SEEDSUB}.6
-GW=${SEEDSUB}.1
-
-VM_LOGIN=root@$VM_IP
-
-HOME_LOGIN=mjb@10.3.3.117
-
 PROMPTS=1
 
 envrc=env_vars
@@ -38,8 +29,8 @@ die() {
 }
 
 showSEEDVMIP() {
-     echo "-- List of SEEDVM ips on subnet '$SEEDSUB' --" >&2
-     ssh root@${VM_IP} ip a | grep ${SEEDSUB}.
+     echo "-- List of SEEDVM ips on subnet '$BM_SEEDSUB' --" >&2
+     ssh root@${VM_IP} ip a | grep ${BM_SEEDSUB}.
      echo "--" >&2
 }
 
@@ -51,10 +42,10 @@ reinit_network() {
 #ip addr add 10.3.160.10/24 dev eth0 scope global
 #route add default gw 10.3.160.1 dev eth0
   set -x
-    ip addr del $SEEDHOST/24 dev brbm
+    ip addr del $BM_SEEDHOST/24 dev brbm
     ovs-vsctl del-port eth0
     ovs-vsctl del-br brbm
-    ip addr add $SEEDHOST/24 dev eth0 scope global
+    ip addr add $BM_SEEDHOST/24 dev eth0 scope global
     route add default gw $GW dev eth0
   set +x
   echo;echo "Routes after:"; route -n
@@ -83,9 +74,9 @@ checkRunningOnSeedHost() {
     [ `hostname` != "helionseed" ] &&
         die "Must be run on seedhost (helionseed)"
     IPADDR=$(ip a | grep 10.3.160 | awk '{ print $2; }')
-    SEEDHOST_24="${SEEDHOST}/24"
-    [ ${IPADDR} != "${SEEDHOST_24}" ] &&
-        die "IP address '$IPADDR' != '${SEEDHOST_24}'"
+    BM_SEEDHOST_24="${BM_SEEDHOST}/24"
+    [ ${IPADDR} != "${BM_SEEDHOST_24}" ] &&
+        die "IP address '$IPADDR' != '${BM_SEEDHOST_24}'"
 }
 
 waitOnSSH() {
@@ -127,6 +118,9 @@ STEP1_CreateSeedVM() {
     [ ! -f $ENVRC ] && die "No such file as '$ENVRC'"
     #pause "Sourcing $ENVRC [ NOTE: you might consider a login/logout first ]"
     . $ENVRC
+
+    [ ! -f VARS ] && die "No such file as 'VARS'"
+    . VARS
 
     createSeed
     virsh list --all
