@@ -1,6 +1,12 @@
+#!/bin/bash
 
 set -o nounset # Force error on unset variables
 #set -x
+
+LOAD_CONFIG_SH=/root/tripleo/tripleo-incubator/scripts/hp_ced_load_config.sh
+
+RELEASE=0
+BUILD_TAG="Unknown Helion build"
 
 press() {
     echo $*
@@ -54,16 +60,83 @@ INSTALLER() {
     [ ! -d logs ] && mkdir logs
     LOG=logs/${START}-cloud_install.log
     echo; echo "Launching ./init_undercloud.sh (logging to $LOG)"
-    ./init_undercloud.sh 2>&1 |& stdbuf -oL tee $LOG
+    ./init_undercloud.sh |& stdbuf -oL tee $LOG
 
     echo "Number of CREATE_FAIL in LOG FILE $LOG:"
     grep -c CREATE_FAIL $LOG
 }
 
+checkVersion() {
+    BUILD_TAG_FILE=/root/tripleo/build_tag
+
+    [ ! -f $BUILD_TAG_FILE ] && die "No such build_tag file as '$BUILD_TAG_FILE'"
+
+    # v1.0.1:
+    # jenkins-installer-build-corvallis-ee-1.0.x-hlinux-ironic-7: Thu Oct 30 10:02:43 PDT 2014
+    M_V101="jenkins-installer-build-corvallis-ee-1.0.x-hlinux-ironic-7:"
+    M_V100="jenkins-installer-build-corvallis-ee-1.0-hlinux-ironic-13:"
+
+    export BUILD_TAG=$(cat $BUILD_TAG_FILE)
+
+    grep $M_V101 $BUILD_TAG_FILE && { echo "Installing Helion EE version 1.0.1";
+        export BUILD=EE100;
+        return 0;
+    }
+    grep $M_V100 $BUILD_TAG_FILE && { echo "Installing Helion EE version 1.0.0";
+        export BUILD=EE101;
+        return 0;
+    }
+
+    die "Failed to determine Helion version from $BUILD_TAG file contents:
+        $(cat $BUILD_TAG)"
+}
+
+sourceVariables() {
+    JSON_DIR=/root/tripleo/config
+    JSON_FILE=kvm-custom-ips.json
+
+    case "$BUILD" in
+        EE100)
+          . ./env_vars
+          . ./VARS
+          ;;
+        EE101)
+          source $LOAD_CONFIG_SH $JSON_DIR/$JSON_FILE
+          . ./VARS
+          ;;
+        *)
+          die "Unsupported release '$BUILD' $BUILD_TAG";
+          ;;
+    esac
+}
+
+createSeed() {
+    reset_net
+    echo; echo "About to restore seed-vm"
+    #press "About to restore seed-vm"
+
+    ./init_seed.sh;
+
+    echo "########################################################################"
+    echo "########################################################################"
+    echo "##"
+    echo "##  INIT_SEED completed"
+    echo "##"
+    echo "########################################################################"
+    echo "########################################################################"
+    
+    echo; echo "Sleeping 30 secs"
+    sleep 30
+
+    add_route
+}
+
+checkVersion
+
+sourceVariables
+
 [ `id -un` != 'root' ] && die "Must be run as root"
 
-. ./env_vars
-. ./VARS
 
 PROMPT=0
 PROMPT=1
@@ -80,23 +153,7 @@ while [ $# -ne 0 ];do
     shift
 done
 
-reset_net
-echo; echo "About to restore seed-vm"
-#press "About to restore seed-vm"
-./init_seed.sh;
-
-echo "########################################################################"
-echo "########################################################################"
-echo "##"
-echo "##  INIT_SEED completed"
-echo "##"
-echo "########################################################################"
-echo "########################################################################"
-
-echo; echo "Sleeping 30 secs"
-sleep 30
-
-add_route
+createSeed
 
 INSTALLER
 

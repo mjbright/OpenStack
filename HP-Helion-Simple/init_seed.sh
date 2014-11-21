@@ -19,4 +19,5 @@ cd /root
 virsh destroy seed
 virsh undefine seed
 
-/root/tripleo/tripleo-incubator/scripts/hp_ced_host_manager.sh --create-seed
+/root/tripleo/tripleo-incubator/scripts/hp_ced_host_manager.sh --create-seed |& tee seedcreate.log
+
