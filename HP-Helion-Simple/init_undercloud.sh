@@ -1,12 +1,27 @@
 #!/bin/bash
 
 set -o nounset # Force error on unset variables
-. ./env_vars
-. ./VARS
 
 SCRIPTS_DIR=/root/tripleo/tripleo-incubator/scripts
+LOAD_CONFIG_SH=$SCRIPTS_DIR/hp_ced_load_config.sh
+
 JSON_DIR=/root/tripleo/configs
 JSON_FILE=kvm-custom-ips.json
+JSON=$JSON_DIR/$JSON_FILE
+
+[ -f ./env_vars ] && {
+    echo ". ./env_vars"
+    . ./env_vars
+}
+
+[ -f $JSON ] && {
+    echo "source $LOAD_CONFIG_SH $JSON"
+    set +o nounset # Force error on unset variables
+    source $LOAD_CONFIG_SH $JSON
+    set -o nounset # Force error on unset variables
+}
+
+. ./VARS
 
 #SRCDIR=/root
 SRCDIR=.
@@ -34,15 +49,14 @@ scp -o StrictHostKeyChecking=no $SRCDIR/hp_ced_functions.sh ${VM_LOGIN}:$SCRIPTS
 ########################################
 # Transfer files to seed VM:
 scp -o StrictHostKeyChecking=no $SRCDIR/baremetal.csv ${VM_LOGIN}:/root/
-scp -o StrictHostKeyChecking=no $JSON_DIR/$JSON_FILE ${VM_LOGIN}:$JSON_DIR/$JSON_FILE
-scp -o StrictHostKeyChecking=no $SRCDIR/env_vars ${VM_LOGIN}:/root/
-scp -o StrictHostKeyChecking=no $SRCDIR/init.sh ${VM_LOGIN}:/root/
+scp -o StrictHostKeyChecking=no $JSON                 ${VM_LOGIN}:$JSON
+scp -o StrictHostKeyChecking=no $SRCDIR/env_vars      ${VM_LOGIN}:/root/
+scp -o StrictHostKeyChecking=no $SRCDIR/init.sh       ${VM_LOGIN}:/root/
 
 press "Will now launch installer"
 
 ########################################
 # Launch installer:
 ssh -o StrictHostKeyChecking=no ${VM_LOGIN} "./init.sh"
-
 
 
