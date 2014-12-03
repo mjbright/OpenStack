@@ -1,9 +1,27 @@
 #!/bin/bash
 
-set -o nounset # Force error on unset variables
+#
+# NOTE: hp_ced_load_config.sh checks whether it is invoked from a bash shell ($0 = *bash)
+#       and assumes it is mistakenly called from a script if this is not the case.
+#
+#       To get around this check we source hp_ced_load_config.sh from scripts called *bash.
+#       e.g. we copy init.sh to the seed vm as init-bash
+#            we check if this script is invoked as INSTALL-bash, if not we check if this link
+#            exists, and if not we link this script to INSTALL-bash prior to invoking it.
+#
+#
+# USAGE:
+#    Launch this script as
+#      ./INSTALL.sh        ## to reset network then perform seedVM creation followed by installation
+#      ./INSTALL.sh -2     ## to perform installation only
+#      ./INSTALL.sh -net   ## to reset network only
+#
+
+set -o nounset # Force error on unset variables (must be disabled before call to LOAD_CONFIG_SH)
 #set -x
 
 LOAD_CONFIG_SH=/root/tripleo/tripleo-incubator/scripts/hp_ced_load_config.sh
+ARGS=$*
 
 RELEASE=0
 BUILD_TAG="Unknown Helion build"
@@ -59,11 +77,57 @@ INSTALLER() {
     START=$(date +%Y-%m-%d-%Hh%Mm%S)
     [ ! -d logs ] && mkdir logs
     LOG=logs/${START}-cloud_install.log
-    echo; echo "Launching ./init_undercloud.sh (logging to $LOG)"
-    ./init_undercloud.sh |& stdbuf -oL tee $LOG
+    #echo; echo "Launching ./init_undercloud.sh (logging to $LOG)"
+    #./init_undercloud.sh |& stdbuf -oL tee $LOG
+
+    echo; echo "Launching INIT_UNDERCLOUD"
+    INIT_UNDERCLOUD |& stdbuf -oL tee $LOG
 
     echo "Number of CREATE_FAIL in LOG FILE $LOG:"
     grep -c CREATE_FAIL $LOG
+}
+
+INIT_UNDERCLOUD() {
+    SCRIPTS_DIR=/root/tripleo/tripleo-incubator/scripts
+
+    JSON_DIR=/root/tripleo/configs
+    JSON_FILE=kvm-custom-ips.json
+    export JSON=$JSON_DIR/$JSON_FILE
+
+    #SRCDIR=/root
+    SRCDIR=.
+
+    VM_LOGIN=root@${BM_NETWORK_SEED_IP}
+
+    ########################################
+    # Modify and transfer hp_ced_functions.sh script to seed VM:
+    HP_C_F=hp_ced_functions.sh
+    NODE_MIN_DISK=200
+    cp -a /root/tripleo/tripleo-incubator/scripts/$HP_C_F $SRCDIR/$HP_C_F
+    sed -i.bak -e "s/^NODE_MIN_DISK=.*$/NODE_MIN_DISK=$NODE_MIN_DISK/g" $SRCDIR/$HP_C_F
+    ls -altr $SRCDIR/$HP_C_F $SRCDIR/${HP_C_F}.bak
+    diff $SRCDIR/$HP_C_F $SRCDIR/${HP_C_F}.bak
+    scp -o StrictHostKeyChecking=no $SRCDIR/hp_ced_functions.sh ${VM_LOGIN}:$SCRIPTS_DIR/hp_ced_functions.sh
+
+    ########################################
+    # Transfer files to seed VM:
+    scp -o StrictHostKeyChecking=no $SRCDIR/baremetal.csv ${VM_LOGIN}:/root/
+    [ -f $JSON            ] && scp -o StrictHostKeyChecking=no $JSON                 ${VM_LOGIN}:$JSON
+    [ -f $SRCDIR/env_vars ] && scp -o StrictHostKeyChecking=no $SRCDIR/env_vars      ${VM_LOGIN}:/root/
+
+    # See above NOTE about *bash checks:
+    scp -o StrictHostKeyChecking=no $SRCDIR/init.sh       ${VM_LOGIN}:/root/init-bash
+
+    press "Will now launch installer"
+
+    ########################################
+    # Launch installer:
+    INIT
+}
+
+INIT() {
+    # See above NOTE about *bash checks:
+    ssh -o StrictHostKeyChecking=no ${VM_LOGIN} "JSON=$JSON LOAD_CONFIG_SH=$LOAD_CONFIG_SH ./init-bash"
 }
 
 checkVersion() {
@@ -77,12 +141,13 @@ checkVersion() {
     M_V100="jenkins-installer-build-corvallis-ee-1.0-hlinux-ironic-13:"
 
     export BUILD_TAG=$(cat $BUILD_TAG_FILE)
+    #echo $BUILD_TAG
 
-    grep $M_V101 $BUILD_TAG_FILE && { echo "Installing Helion EE version 1.0.1";
+    grep $M_V100 $BUILD_TAG_FILE && { echo "Installing Helion EE version 1.0.0";
         export BUILD=EE100;
         return 0;
     }
-    grep $M_V100 $BUILD_TAG_FILE && { echo "Installing Helion EE version 1.0.0";
+    grep $M_V101 $BUILD_TAG_FILE && { echo "Installing Helion EE version 1.0.1";
         export BUILD=EE101;
         return 0;
     }
@@ -101,13 +166,17 @@ sourceVariables() {
           . ./VARS
           ;;
         EE101)
+          set +o nounset # Force error on unset variables
           source $LOAD_CONFIG_SH $JSON_DIR/$JSON_FILE
+          set -o nounset # Force error on unset variables
           . ./VARS
           ;;
         *)
           die "Unsupported release '$BUILD' $BUILD_TAG";
           ;;
     esac
+
+    env | grep -q BM_NETWORK_SEED_IP || die "Missing variable definitions"
 }
 
 createSeed() {
@@ -130,6 +199,26 @@ createSeed() {
 
     add_route
 }
+
+checkLaunchedAsInstallBash() {
+
+    # See above NOTE about *bash checks:
+    if [[ "$0" != *"bash" ]] ; then
+        DIR=${0%/*}
+        I_BASH=$DIR/INSTALL-bash
+        [ -h $I_BASH ] || {
+            echo "Creating link from $0 to $I_BASH";
+            set -x; ln -s $0 $I_BASH; set +x;
+        }
+        
+        ls -altr $I_BASH
+        #die exec $I_BASH
+        echo exec $I_BASH $ARGS
+        exec $I_BASH $ARGS
+    fi
+}
+
+checkLaunchedAsInstallBash
 
 checkVersion
 

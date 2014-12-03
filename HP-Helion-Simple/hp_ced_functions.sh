@@ -93,11 +93,11 @@ export -f isnumber
 # Add h/w real system limits with overrides possible
 NODE_MIN_CPU=${NODE_MIN_CPU:-1}
 NODE_MIN_MEMORY=${NODE_MIN_MEMORY:-32768}
-#NODE_MIN_DISK=${NODE_MIN_DISK:-512}
-NODE_MIN_DISK=${NODE_MIN_DISK:-200}
-# ironic has a 2TB maximum limit
+NODE_MIN_DISK=${NODE_MIN_DISK:-512}
+# ironic has a 2TB maximum limit when the partition type is MSDOS.
+# The partition type is now GPT but leave a hook to check the max.
 # TODO: remove this limit when ironic is fixed.
-NODE_MAX_DISK=${NODE_MAX_DISK:-2048}
+NODE_MAX_DISK=${NODE_MAX_DISK:-}
 
 validate_node() {
     # Validate CPU, Memory and Disk
