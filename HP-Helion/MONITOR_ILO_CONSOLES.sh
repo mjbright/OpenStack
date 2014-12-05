@@ -49,7 +49,7 @@ echo "ILOS=$ILOS"
 #exit 0
 
 
-SSH_OPTS="-o MACS=hmac-sha1,hmac-md5 -i /home/mjb/.ssh/ILO_dsa -o StrictHostKeyChecking=no -o ServerAliveInterval=60"
+SSH_OPTS="-o MACS=hmac-sha1,hmac-md5 -i $HOME/.ssh/ILO_dsa -o StrictHostKeyChecking=no -o ServerAliveInterval=60"
 
 echo "Old sessions:"
 $TMUX ls
@@ -65,7 +65,7 @@ echo "Creating new-session $SESSION_NAME"
 $TMUX new-session -s $SESSION_NAME -d 'bash'
 
 DATETIME=$(date +%Y-%m-%d-%Hh%Mm%S)
-DIR=/home/mjb/ILO/${DATETIME}_${SESSION_NAME}.logs
+DIR=$HOME/ILO/${DATETIME}_${SESSION_NAME}.logs
 
 [ ! -d $DIR ] && mkdir -p $DIR
 
