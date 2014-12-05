@@ -87,12 +87,25 @@ INSTALLER() {
     grep -c CREATE_FAIL $LOG
 }
 
+installJQ() {
+    jq '.' /dev/null 2>/dev/null || { echo "Installing jq ..."; apt-get install jq; }
+}
+
+syntaxCheckJSON() {
+    JSON=$1; shift
+
+    jq '.' $JSON  >/dev/null || die "Syntax error in JSON file '$JSON'"
+}
+
 INIT_UNDERCLOUD() {
     SCRIPTS_DIR=/root/tripleo/tripleo-incubator/scripts
 
     JSON_DIR=/root/tripleo/configs
     JSON_FILE=kvm-custom-ips.json
     export JSON=$JSON_DIR/$JSON_FILE
+
+    installJQ
+    syntaxCheckJSON $JSON
 
     #SRCDIR=/root
     SRCDIR=.
@@ -117,6 +130,14 @@ INIT_UNDERCLOUD() {
 
     # See above NOTE about *bash checks:
     scp -o StrictHostKeyChecking=no $SRCDIR/init.sh       ${VM_LOGIN}:/root/init-bash
+
+    # undercloud/overcloud dns:
+    HP_PASS=/root/tripleo/hp_passthrough/
+
+    for JSON in $HP_PASS/undercloud_neutron_dhcp_agent.json $HP_PASS/overcloud_neutron_dhcp_agent.json; do
+        syntaxCheckJSON $JSON
+        scp -o StrictHostKeyChecking=no $JSON ${VM_LOGIN}:$JSON
+    done
 
     press "Will now launch installer"
 
