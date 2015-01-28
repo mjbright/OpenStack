@@ -25,10 +25,13 @@ echo; echo "Creating ssh key if needed, installing needed packages, restarting l
 # Install required packages:
 X11_PACKAGES="xrdp xfce4 libssl-dev libffi-dev virt-manager chromium-browser"
 PACKAGES="libvirt-bin openvswitch-switch openvswitch-common python-libvirt qemu-kvm"
+EXTRA_PACKAGES="tmux ipmitool"
 
 # Comment out if X11 packages are not required:
 PACKAGES+=" "
 PACKAGES+=$X11_PACKAGES
+PACKAGES+=" "
+PACKAGES+=$EXTRA_PACKAGES
 
 echo "apt-get install -y $PACKAGES"
 apt-get install -y $PACKAGES
