@@ -9,7 +9,10 @@ CSVFILE=baremetal.csv
 [ ! -f $CSVFILE ] && CSVFILE=/home/user/baremetal.csv
 [ ! -f $CSVFILE ] && CSVFILE=/root/baremetal.csv
 
-STATUS_FILE=$HOME/tmp/ipmitool_status.$$
+TMP=$HOME/tmp/ipmitool_status
+[ ! -d $TMP ] && mkdir -p $TMP
+
+STATUS_FILE=$TMP/ipmitool_status.$$
 
 VERBOSE=1
 VERBOSE=0
