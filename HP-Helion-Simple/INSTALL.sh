@@ -20,6 +20,11 @@
 set -o nounset # Force error on unset variables (must be disabled before call to LOAD_CONFIG_SH)
 #set -x
 
+START=$(date +%Y-%m-%d-%Hh%Mm%S)
+
+LOG1=logs/INSTALL.sh.log
+LOG2=logs/${START}-cloud_install.log
+
 LOAD_CONFIG_SH=/root/tripleo/tripleo-incubator/scripts/hp_ced_load_config.sh
 ARGS=$*
 
@@ -74,17 +79,18 @@ INSTALLER() {
     echo "ssh $LOGIN ping $BM_GATEWAY"
 
     press "About to launch installer [ remember to launch ping GW from SEEDVM ]"
-    START=$(date +%Y-%m-%d-%Hh%Mm%S)
     [ ! -d logs ] && mkdir logs
-    LOG=logs/${START}-cloud_install.log
     #echo; echo "Launching ./init_undercloud.sh (logging to $LOG)"
-    #./init_undercloud.sh |& stdbuf -oL tee $LOG
+    #./init_undercloud.sh |& stdbuf -oL tee $LOG2
 
-    echo; echo "Launching INIT_UNDERCLOUD"
-    INIT_UNDERCLOUD |& stdbuf -oL tee $LOG
+    echo; echo "Launching INIT_UNDERCLOUD [Logging to $LOG2]:"
+    INIT_UNDERCLOUD |& stdbuf -oL tee $LOG2
 
-    echo "Number of CREATE_FAIL in LOG FILE $LOG:"
-    grep -c CREATE_FAIL $LOG
+    echo "Number of CREATE_FAIL in LOG FILE $LOG2:"
+    grep -c CREATE_FAIL $LOG2
+    grep -q "No valid host" $LOG2 && {
+        echo "Error 'No valid host' seen in $LOG2"
+    }
 }
 
 installJQ() {
@@ -92,7 +98,7 @@ installJQ() {
 }
 
 syntaxCheckJSON() {
-    JSON=$1; shift
+    local JSON=$1; shift
 
     jq '.' $JSON  >/dev/null || die "Syntax error in JSON file '$JSON'"
 }
@@ -134,9 +140,9 @@ INIT_UNDERCLOUD() {
     # undercloud/overcloud dns:
     HP_PASS=/root/tripleo/hp_passthrough/
 
-    for JSON in $HP_PASS/undercloud_neutron_dhcp_agent.json $HP_PASS/overcloud_neutron_dhcp_agent.json; do
-        syntaxCheckJSON $JSON
-        scp -o StrictHostKeyChecking=no $JSON ${VM_LOGIN}:$JSON
+    for json in $HP_PASS/undercloud_neutron_dhcp_agent.json $HP_PASS/overcloud_neutron_dhcp_agent.json; do
+        syntaxCheckJSON $json
+        scp -o StrictHostKeyChecking=no $json ${VM_LOGIN}:$json
     done
 
     press "Will now launch installer"
@@ -181,10 +187,13 @@ sourceVariables() {
     JSON_DIR=/root/tripleo/configs
     JSON_FILE=kvm-custom-ips.json
 
+    env > .env.0.txt
+
     case "$BUILD" in
         EE100)
           . ./env_vars
           . ./VARS
+          die "No more v.1.0"
           ;;
         EE101)
           set +o nounset # Force error on unset variables
@@ -197,6 +206,7 @@ sourceVariables() {
           ;;
     esac
 
+    env > .env.txt
     env | grep -q BM_NETWORK_SEED_IP || die "Missing variable definitions"
 }
 
@@ -234,8 +244,10 @@ checkLaunchedAsInstallBash() {
         
         ls -altr $I_BASH
         #die exec $I_BASH
-        echo exec $I_BASH $ARGS
-        exec $I_BASH $ARGS
+        [ -f $LOG1 ] && die "'$LOG1' already exists, please rename/delete"
+        echo "[Logging to $LOG1]: exec $I_BASH $ARGS"
+        exec $I_BASH $ARGS |& stdbuf -oL tee $LOG1
+tee INSTALL.sh.log
     fi
 }
 
@@ -250,9 +262,13 @@ sourceVariables
 
 PROMPT=0
 PROMPT=1
+#SET_X=0
 
 while [ $# -ne 0 ];do
     case $1 in
+        #-x) set -x; SET_X=1;;
+        #+x) set +x;;
+
         -2) INSTALLER; exit 0;;
         -net) reset_net; exit 0;;
 
