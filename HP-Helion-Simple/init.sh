@@ -1,5 +1,8 @@
 #!/bin/bash
 
+INSTALLER_OPTS=""
+INSTALLER_OPTS="--skip-demo"
+
 set -o nounset # Force error on unset variables
 
 die() {
@@ -27,6 +30,6 @@ env | grep 192.0 && {
 
 cd /root;
 
-bash -x /root/tripleo/tripleo-incubator/scripts/hp_ced_installer.sh |& tee cloud_install.log 
+bash -x /root/tripleo/tripleo-incubator/scripts/hp_ced_installer.sh $INSTALLER_OPTS |& tee cloud_install.log 
 
 
