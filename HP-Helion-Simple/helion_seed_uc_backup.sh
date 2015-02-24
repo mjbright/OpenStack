@@ -58,7 +58,7 @@ echo "DF_KBYTES_AVAIL[MBy]=$DF_KBYTES_AVAIL_MB"
 echo "NINETYPC_AVAIL[MBy]=$NINETYPC_AVAIL_MB"
 echo
 if [ $NINETYPC_AVAIL_MB -le $EXTIMATED_UNDERCLOUD_SIZE_MB ];then
-    die "Insufficient space for seed VM backup (${NINETYPC_AVAIL_MB}MBy < estimated UC backup size ${EXTIMATED_UNDERCLOUD_SIZE_MB}MBy)"
+    die "Insufficient space for UC backup (${NINETYPC_AVAIL_MB}MBy < estimated UC backup size ${EXTIMATED_UNDERCLOUD_SIZE_MB}MBy)"
 fi
 echo ; echo "Sufficient disk space for underloud backup - proceeding ..."
 
