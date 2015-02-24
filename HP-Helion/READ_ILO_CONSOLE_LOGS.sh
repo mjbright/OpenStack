@@ -64,6 +64,31 @@ while [ ! -z "$1" ];do
     case $1 in
         -)
             unescapeILO;; # stdin -> stdout
+        -tail)
+            [ ! -f "$2" ] && die "No such file <$2>"
+            RAW="$2"
+            declare -A LINE_COUNTS
+            declare -A BYTE_COUNTS
+            while true; do
+                BYTE_COUNT=$(wc -c < $RAW)
+                [ $BYTE_COUNT != "${BYTE_COUNTS[$RAW]}" ] && {
+                    $0 $RAW 2>/dev/null
+                    LINE_COUNT=$(wc -l < ${RAW}.OP)
+                    [ $LINE_COUNT != "${LINE_COUNTS[$RAW]}" ] && {
+                        #let OLD_LINE_COUNT=${LINE_COUNTS[$RAW]:0}
+                        let LINES=$LINE_COUNT-${LINE_COUNTS[$RAW]:-0}
+
+                        FILE=${RAW}.OP
+                        tail -$LINES ${RAW}.OP
+                    }
+                
+                    LINE_COUNTS[$RAW]=$LINE_COUNT;
+                    BYTE_COUNTS[$RAW]=$BYTE_COUNT;
+                }
+                sleep 1
+            done
+            ;;
+
         -TAIL)
             # Get directory name either as argument "$1" or as last updated dir:
             # Get filename of last modified .raw file:
