@@ -5,19 +5,21 @@ from __future__ import print_function
 from __future__ import unicode_literals # all string literals will be Unicode by default.
 
 '''
-TODO: Note - not working (because of --all-tenants): ./ssh_helion.py -P poc1 --unl
-TODO: Reminder - use of ^] to quit
-TODO: Make command-line options usable/easy to understand/remember
-TODO: Auto create ssh-config for auto-logins to nodes
-TODO: Extend to scp capabilities to all nodes (better just via ssh key ... but)
+TODO: Rearchive on github
 TODO: Add comments to all code
-TODO: Parse nova list of (undercloud nova list) overcloud nodes -> optionally append to Default.ini
+TODO: Allow to perform command(s), e.g. df on each node
+TODO: Select all/subset of nodes - for key installation, for running command, ...
+TODO: Make command-line options usable/easy to understand/remember
+TODO: Parse nova list of (undercloud nova list) overcloud nodes:
+TODOL     -> optionally append to Default.ini
+TODO:     -> Auto create an ssh-config file for auto-logins to nodes
+TODO: Extend to scp capabilities to all nodes (better just via ssh key ... but may be needed)
 TODO: Get addresses from ini file or from nova list
 TODO: Choose ini file, section
-TODO: Select all/subset of nodes - for key installation, for running command, ...
 TODO: Login via pexpext or via keys or via password
-TODO: Install ssh keys
+TODO: Install ssh keys (same key for all nodes, or by type, or by node... - just same key for now)
 TODO: Check ssh keys installation
+TODO: Reminder - use of ^] to quit
 '''
 
 import re
@@ -93,6 +95,8 @@ COMMAND_SHOW_UNDERCLOUD_PASSWORDS=101
 COMMAND_SHOW_OVERCLOUD_PASSWORDS=102
 COMMAND_UC_NOVALIST=103
 COMMAND_OC_NOVALIST=104
+COMMAND_UC_NOVALIST_ALLTENANTS=105
+COMMAND_OC_NOVALIST_ALLTENANTS=106
 COMMAND_INTERACT=199 # default subaction
 
 ################################################################################
@@ -121,6 +125,8 @@ def parseArgs():
     parser.add_argument('--opwd', dest='COMMANDS', action='append_const', const=COMMAND_SHOW_OVERCLOUD_PASSWORDS)
     parser.add_argument('--unl', dest='COMMANDS', action='append_const', const=COMMAND_UC_NOVALIST)
     parser.add_argument('--onl', dest='COMMANDS', action='append_const', const=COMMAND_OC_NOVALIST)
+    parser.add_argument('--unla', dest='COMMANDS', action='append_const', const=COMMAND_UC_NOVALIST_ALLTENANTS)
+    parser.add_argument('--onla', dest='COMMANDS', action='append_const', const=COMMAND_OC_NOVALIST_ALLTENANTS)
 
     args = parser.parse_args()
     #if args: print(args.accumulate(args.integers))
@@ -283,10 +289,10 @@ def parseTable(tableText):
 
 def testParseNovaList():
     table = parseTable(TEST_STRING)
-    nodes = getNodeHash(table)
-    print("NODES=" + str(nodes))
+    nodes = interpretOvercloudNodeNames(table)
+    print("TEST_NODES=" + str(nodes))
 
-def getNodeHash(table):
+def interpretOvercloudNodeNames(table):
     nodes = {}
 
     #print("table[type " + str(type(table)) + "] has " + str(len(table)) + " rows")
@@ -315,9 +321,14 @@ def getNodeHash(table):
                 break
      
         if idxname == None:
+            if VERBOSE:
+                print("table[type " + str(type(table)) + "] has " + str(len(table)) + " rows")
+                print("row[type " + str(type(row)) + "] has " + str(len(row)) + " elements")
+                print("ROW=" + str(row))
             die("Failed to match name <" + name + ">")
 
-        nodes[name]=ip
+        #nodes[name]=ip
+        nodes[idxname]=ip
 
     if VERBOSE:
         print("NODES=" + str(nodes))
@@ -332,8 +343,27 @@ def parseUndercloudNovalist(novalist):
     #| ID        | Name          | Status | Task State | Power State | Networks   |
     # HOW TO REMOVE 'NOVA LIST'
     table = parseTable(novalist)
-    nodes = getNodeHash(table)
+    nodes = interpretOvercloudNodeNames(table)
     return nodes
+
+def runUndercloudCommand(child, cmd, stackrc, parserFn):
+    if stackrc != None:
+        STEP("sourcing " + stackrc)
+        child.sendline('. ' + stackrc)
+        child.expect ('[#\$] ')
+
+    STEP(cmd)
+    child.sendline(cmd)
+    child.expect ('[#\$] ')
+    cmdop = child.before
+    print(cmdop)
+    
+    if parserFn != None:
+        # if 'nova list' in cmd:
+        parsed = parserFn(cmdop)
+        return parsed
+
+    return cmdop
 
 def performCommand(child, COMMAND):
     """ FUNCTION DESCRIPTION """
@@ -350,25 +380,23 @@ def performCommand(child, COMMAND):
         print(passwords)
 
     if COMMAND == COMMAND_UC_NOVALIST:
-        STEP("sourcing stackrc")
-        child.sendline('. stackrc')
-        child.expect ('[#\$] ')
-        STEP("nova list")
-        child.sendline('nova list --all-tenants')
-        child.expect ('[#\$] ')
-        novalist = child.before
-        nodes = parseUndercloudNovalist(novalist)
-        print(novalist)
+        table = runUndercloudCommand(child, 'nova list', '/root/stackrc', parseUndercloudNovalist)
+        #print(str(table))
+
+    if COMMAND == COMMAND_UC_NOVALIST_ALLTENANTS:
+        # Uninteresting ... shouldn't differ from 'nova list' for undercloud
+        table = runUndercloudCommand(child, 'nova list --all-tenants', '/root/stackrc', parseUndercloudNovalist)
+        #print(str(table))
 
     if COMMAND == COMMAND_OC_NOVALIST:
-        STEP("sourcing overcloud.stackrc")
-        child.sendline('. overcloud.stackrc')
-        child.expect ('[#\$] ')
-        STEP("nova list")
-        child.sendline('nova list --all-tenants')
-        child.expect ('[#\$] ')
-        novalist = child.before
-        print(novalist)
+        table = runUndercloudCommand(child, 'nova list', '/root/overcloud.stackrc', parseTable)
+        if VERBOSE:
+            print(str(table))
+
+    if COMMAND == COMMAND_OC_NOVALIST_ALLTENANTS:
+        table = runUndercloudCommand(child, 'nova list --all-tenants', '/root/overcloud.stackrc', parseTable)
+        if VERBOSE:
+            print(str(table))
 
     if COMMAND == COMMAND_INTERACT:
         child.interact()
@@ -470,34 +498,32 @@ for NODE in NODES:
 
         if COMMAND == COMMAND_SHOW_UNDERCLOUD_PASSWORDS:
             performCommand(CLIENT_SEEDVM, COMMAND)
-            #die("TODO - SEEDVM ONLY")
-            #NODE=NODE_SEEDVM
 
         elif COMMAND == COMMAND_SHOW_OVERCLOUD_PASSWORDS:
             performCommand(CLIENT_SEEDVM, COMMAND)
-            #die("TODO - SEEDVM ONLY")
-            #NODE=NODE_SEEDVM
 
         elif COMMAND == COMMAND_UC_NOVALIST:
             performCommand(CLIENT_UC_ROOT, COMMAND)
-            #connectToNode(NODE)
-            #performCommand(COMMAND)
             die("TODO - UC ONLY")
-            #NODE=NODE_UNDERCLOUD_ROOT
+
+        elif COMMAND == COMMAND_UC_NOVALIST_ALLTENANTS:
+            performCommand(CLIENT_UC_ROOT, COMMAND)
+            die("TODO - UC ONLY")
 
         elif COMMAND == COMMAND_OC_NOVALIST:
             performCommand(CLIENT_UC_ROOT, COMMAND)
-            #connectToNode(NODE)
-            #performCommand(COMMAND)
             die("TODO - UC ONLY")
-            #NODE=NODE_UNDERCLOUD_ROOT
+    
+        elif COMMAND == COMMAND_OC_NOVALIST_ALLTENANTS:
+            performCommand(CLIENT_UC_ROOT, COMMAND)
+            die("TODO - UC ONLY")
     
         elif COMMAND == COMMAND_INTERACT:
             die("TODO")
             pass
 
         else:
-            die("TODO")
+            die("TODO - untreated command in NODES loop")
 
 #testParseNovaList()
 #testParseTable()
