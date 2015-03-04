@@ -5,10 +5,10 @@ from __future__ import print_function
 from __future__ import unicode_literals # all string literals will be Unicode by default.
 
 '''
+TODO: Create a pexpect_client class which holds it's own metadata on login etc.
 TODO: Rearchive on github
-TODO: Add comments to all code
-TODO: Allow to perform command(s), e.g. df on each node
-TODO: Select all/subset of nodes - for key installation, for running command, ...
+TODO: IMPROVE - Allow to perform command(s), e.g. df on each node
+TODO: IMPROVE - Select all/subset of nodes - for key installation, for running command, ...
 TODO: Make command-line options usable/easy to understand/remember
 TODO: Parse nova list of (undercloud nova list) overcloud nodes:
 TODOL     -> optionally append to Default.ini
@@ -46,11 +46,14 @@ NODE_UNDERCLOUD=4
 NODE_UNDERCLOUD_ROOT=5
 
 # 10+: controller nodes
-NODE_SWIFT0=10
-NODE_SWIFT1=11
-NODE_CONTROLLER0=12
-NODE_CONTROLLER1=13
-NODE_CONTROLLER0MGMT=14
+#NODE_SWIFT0=10
+#NODE_SWIFT1=11
+#NODE_CONTROLLER0=12
+#NODE_CONTROLLER1=13
+#NODE_CONTROLLER0MGMT=14
+
+NODE_TO_ENUMERATE=99
+# NODES are then indices into nodes table + 20
 
 # 20+: compute nodes
 
@@ -85,8 +88,23 @@ root@undercloud-undercloud-a52axnkcnktt:~# nova list
 +--------------------------------------+------------------------------------------------------+--------+------------+-------------+----------------------+
 trailing junk
 """
+
+def TOBE_DONE_QUIETEN(level, FUNCTION, *ARGS):
+    """ Apply temporary debug level to quieten, or louden some function call """
+    global VERBOSE
+
+    save_VERBOSE = VERBOSE
+    VERBOSE = level
+
+    if ARGS == None:
+        FUNCTION()
+    else:
+        FUNCTION(ARGS)
+
+    VERBOSE = save_VERBOSE
+
 def DEBUG(level, message):
-    """ FUNCTION DESCRIPTION """
+    """ Print the message if VERBOSE is greater or equal to the specified debug level """
     if VERBOSE >= level:
         print(message)
 
@@ -97,17 +115,18 @@ COMMAND_UC_NOVALIST=103
 COMMAND_OC_NOVALIST=104
 COMMAND_UC_NOVALIST_ALLTENANTS=105
 COMMAND_OC_NOVALIST_ALLTENANTS=106
+COMMAND_ONALL_NODES=107
 COMMAND_INTERACT=199 # default subaction
 
 ################################################################################
 # Functions:
 
 def STEP(STEP):
-    """ FUNCTION DESCRIPTION """
+    """ Print a formatted DEBUG message to show the current performed STEP """
     DEBUG(1,"-------- STEP[" + STEP + "] --------")
 
 def parseArgs():
-    """ FUNCTION DESCRIPTION """
+    """ Parse the command-line arguments using the parseargs module """
     parser = argparse.ArgumentParser(description='Process optional platform and node names')
     #parser.add_argument('v', metavar='verbose', type=int, default=0, help='set verbose level')
     parser.add_argument('--verbose', '-v', dest='VERBOSE', action='count')
@@ -127,18 +146,22 @@ def parseArgs():
     parser.add_argument('--onl', dest='COMMANDS', action='append_const', const=COMMAND_OC_NOVALIST)
     parser.add_argument('--unla', dest='COMMANDS', action='append_const', const=COMMAND_UC_NOVALIST_ALLTENANTS)
     parser.add_argument('--onla', dest='COMMANDS', action='append_const', const=COMMAND_OC_NOVALIST_ALLTENANTS)
+    parser.add_argument('--cmd', dest='COMMAND_ONALL_NODES_ARGS', action='store')
+
+    parser.add_argument('--inc', dest='INC_NODES', action='append')
+    parser.add_argument('--exc', dest='EXC_NODES', action='append')
 
     args = parser.parse_args()
     #if args: print(args.accumulate(args.integers))
     return args
 
 def die(msg):
-    """ FUNCTION DESCRIPTION """
+    """ Fail and exit """
     print(msg)
     sys.exit(1)
 
 def readConfig(section):
-    """ FUNCTION DESCRIPTION """
+    """ Read the specified section from the Default.ini platfornm_config file """
     #[Platform]
     #seed_host=user@10.3.160.10
     #seed_vm=10.3.160.6
@@ -159,40 +182,43 @@ def readConfig(section):
 
     return CFG
 
-def waitOnPossibleSudoPasswordPrompt(child, password):
-    """ FUNCTION DESCRIPTION """
+def showClient(label, client):
+    print(label, str(client).split('\n')[0])
+
+def waitOnPossibleSudoPasswordPrompt(client, password):
+    """ Check if password prompt from sudo, if so send password and wait for shell prompt """
     DEBUG(2,"Waiting for possible password prompt")
-    i = child.expect (['password for', '[#\$] '])
+    i = client.expect (['password for', '[#\$] '])
     if i == 0:
-        DEBUG(2,"Sending password <" + str(child.match.string) +">")
-        child.sendline(password)
+        DEBUG(2,"Sending password <" + str(client.match.string) +">")
+        client.sendline(password)
         #STEP("sent password/waiting on prompt")
-        child.expect('root.*')
+        client.expect('root.*')
         #STEP("GOT prompt")
-        #print("PROMPT <" + child.match.string + ">")
+        #print("PROMPT <" + client.match.string + ">")
     elif i==1:
-        #print("OK <" + str(child.match.string) + ">")
+        #print("OK <" + str(client.match.string) + ">")
         pass
     #waitOnVMRootPrompt()
 
-#child.expect('password:')
-#child.sendline (my_secret_password)
+#client.expect('password:')
+#client.sendline (my_secret_password)
 ## We expect any of these three patterns...
-#i = child.expect (['Permission denied', 'Terminal type', '[#\$] '])
+#i = client.expect (['Permission denied', 'Terminal type', '[#\$] '])
 #if i==0:
 #    print 'Permission denied on host. Can't login'
-#    child.kill(0)
+#    client.kill(0)
 #elif i==2:
 #    print 'Login OK... need to send terminal type.'
-#    child.sendline('vt100')
-#    child.expect ('[#\$] ')
+#    client.sendline('vt100')
+#    client.expect ('[#\$] ')
 #elif i==3:
 #    print 'Login OK.'
-#    print 'Shell command prompt', child.after
+#    print 'Shell command prompt', client.after
 #
 
 def connectToSeed():
-    """ FUNCTION DESCRIPTION """
+    """ Create a Pexpect connecton to the seedhost """
     # Use spawnu for Python3 compatibility
 
     ssh_passwd_opts=''
@@ -200,14 +226,14 @@ def connectToSeed():
         command = '/usr/bin/ssh ' + ssh_passwd_opts + ' ' + CONFIG['seed_login']
         if VERBOSE:
             print("Logging in using ssh-keys <" + command + ">")
-        child = pexpect.spawnu(command)
-        seen = child.expect('^.+')
+        client = pexpect.spawnu(command)
+        seen = client.expect('^.+')
         if seen == 0:
             if VERBOSE:
-                print(child.before)
+                print(client.before)
             #die("SSH-KEYS: failed to log in to seedhost <" + CONFIG['seed_login'] + "> using ssh-keys")
         STEP("SEEDHOST")
-        return child
+        return client
 
     #ssh_passwd_opts='-o PreferredAuthentications=keyboard-interactive -o PubkeyAuthentication=no'
     ssh_passwd_opts='-o PubkeyAuthentication=no'
@@ -216,12 +242,12 @@ def connectToSeed():
     command = '/usr/bin/ssh ' + ssh_passwd_opts + ' ' + CONFIG['seed_login']
     if VERBOSE:
         print("Logging in using password <" + command + ">")
-    child = pexpect.spawnu(command)
+    client = pexpect.spawnu(command)
     # user@10.3.160.10's password:
-    #seen = child.expect('.+s password:')
+    #seen = client.expect('.+s password:')
     try:
-        seen = child.expect('password:', timeout=10)
-        #i = child.expect ([pattern1, pattern2, pattern3, etc])
+        seen = client.expect('password:', timeout=10)
+        #i = client.expect ([pattern1, pattern2, pattern3, etc])
     except Exception as e:
         if VERBOSE:
             print("Expected password prompt - timed out on command (" + command + ")")
@@ -230,32 +256,33 @@ def connectToSeed():
         else:
             print("Expected password prompt - timed out on command (" + command + ")")
 
-        # ?? print(str(child))
-        # It is also useful to log the child's input and out to a file or the screen.
+        # ?? print(str(client))
+        # It is also useful to log the client's input and out to a file or the screen.
         # The following will turn on logging and send output to stdout (the screen).
-        #child = pexpect.spawn (foo)
-        #child.logfile = sys.stdout
+        #client = pexpect.spawn (foo)
+        #client.logfile = sys.stdout
         sys.exit(1)
 
     #if VERBOSE: print("SEEN=" + str(seen))
     if seen == 0:
-        if VERBOSE: print(child.before)
+        if VERBOSE: print(client.before)
         #die("PASSWORD: failed to log in to seedhost <" + CONFIG['seed_login'] + "> using password")
 
     if VERBOSE: print("Sending password (contains " + str(len(CONFIG['seed_password'])) + " chars)")
-    child.sendline(CONFIG['seed_password'])
+    client.sendline(CONFIG['seed_password'])
     #die("PASSWORD")
 
     STEP("SEEDHOST")
-    return child
+    return client
 
 def waitOnVMRootPrompt():
-    """ FUNCTION DESCRIPTION """
+    """ Wait for the root@hLinux prompt of the seed VM """
     print("waiting on VMRoot prompt")
-    child.expect('root\@hLinux:\~ ')
-    child.expect('root@hLinux:~ ')
+    #client.expect('root\@hLinux:\~ ')
+    client.expect('root@hLinux:~ ')
     
 def parseTable(tableText):
+    """ Parse the OpenStack cli style table output and place this in a Python List """
     table = []
     #table = None
     tableDelimitersSeen=0
@@ -287,12 +314,14 @@ def parseTable(tableText):
 
     return table
 
-def testParseNovaList():
+def testParseTableAndOVNames():
+    """ test parseTable and interpretOvercloudNodeNames functions """
     table = parseTable(TEST_STRING)
     nodes = interpretOvercloudNodeNames(table)
     print("TEST_NODES=" + str(nodes))
 
 def interpretOvercloudNodeNames(table):
+    """ determine logical names, such as swift1, vsa2 etc for overcloud node names """
     nodes = {}
 
     #print("table[type " + str(type(table)) + "] has " + str(len(table)) + " rows")
@@ -303,7 +332,12 @@ def interpretOvercloudNodeNames(table):
         #print("row[type " + str(type(row)) + "] has " + str(len(row)) + " elements")
     
         name=row[1]
+
         ip=row[5]
+        m = re.compile('ctlplane=(\S+)').match(ip)
+        if m == None:
+            die("Failed to find ip address in IP field <" + ip + ">")
+        ip = m.group(1)
 
         controller_types={
             'overcloud-ce-controller-SwiftStorage':    'swift',
@@ -328,34 +362,39 @@ def interpretOvercloudNodeNames(table):
             die("Failed to match name <" + name + ">")
 
         #nodes[name]=ip
-        nodes[idxname]=ip
+        nodes[idxname]= { 'ip': ip, 'name': name, 'id': id }
 
     if VERBOSE:
         print("NODES=" + str(nodes))
     return nodes
 
 def testParseTable():
+    """ Test the parseTable function on TEST_STRING """
     parseTable(TEST_STRING)
     #parseTable(TEST_SHORT_STRING)
 
 def parseUndercloudNovalist(novalist):
-    """ FUNCTION DESCRIPTION """
+    """ Parse the underCloud nova list, build table of nodes with logical names, vsa1 etc. """
     #| ID        | Name          | Status | Task State | Power State | Networks   |
     # HOW TO REMOVE 'NOVA LIST'
     table = parseTable(novalist)
     nodes = interpretOvercloudNodeNames(table)
     return nodes
 
-def runUndercloudCommand(child, cmd, stackrc, parserFn):
+def runUndercloudCommand(client, cmd, stackrc, parserFn):
+    """ Run the specified command on the undercloud node,
+        first source specified stackrc file - if specified
+        then parse the output using the parserFn function- if specified
+    """
     if stackrc != None:
         STEP("sourcing " + stackrc)
-        child.sendline('. ' + stackrc)
-        child.expect ('[#\$] ')
+        client.sendline('. ' + stackrc)
+        client.expect ('[#\$] ')
 
     STEP(cmd)
-    child.sendline(cmd)
-    child.expect ('[#\$] ')
-    cmdop = child.before
+    client.sendline(cmd)
+    client.expect ('[#\$] ')
+    cmdop = client.before
     print(cmdop)
     
     if parserFn != None:
@@ -365,100 +404,178 @@ def runUndercloudCommand(child, cmd, stackrc, parserFn):
 
     return cmdop
 
-def performCommand(child, COMMAND):
-    """ FUNCTION DESCRIPTION """
+def performCommand(client, COMMAND, OPT_COMMAND_ARGS=None):
+    """ Run the specified COMMAND on the given client connection """
     if COMMAND == COMMAND_SHOW_UNDERCLOUD_PASSWORDS:
-        child.sendline('cat /root/tripleo/tripleo-undercloud-passwords')
-        child.expect ('[#\$] ')
-        passwords = child.before
+        client.sendline('cat /root/tripleo/tripleo-undercloud-passwords')
+        client.expect ('[#\$] ')
+        passwords = client.before
         print(passwords)
+        return passwords
 
-    if COMMAND == COMMAND_SHOW_OVERCLOUD_PASSWORDS:
-        child.sendline('cat /root/tripleo/tripleo-overcloud-passwords')
-        child.expect ('[#\$] ')
-        passwords = child.before
+    elif COMMAND == COMMAND_SHOW_OVERCLOUD_PASSWORDS:
+        client.sendline('cat /root/tripleo/tripleo-overcloud-passwords')
+        client.expect ('[#\$] ')
+        passwords = client.before
         print(passwords)
+        return passwords
 
-    if COMMAND == COMMAND_UC_NOVALIST:
-        table = runUndercloudCommand(child, 'nova list', '/root/stackrc', parseUndercloudNovalist)
+    elif COMMAND == COMMAND_UC_NOVALIST:
+        table = runUndercloudCommand(client, 'nova list', '/root/stackrc', parseUndercloudNovalist)
         #print(str(table))
+        return table
 
-    if COMMAND == COMMAND_UC_NOVALIST_ALLTENANTS:
+    elif COMMAND == COMMAND_UC_NOVALIST_ALLTENANTS:
         # Uninteresting ... shouldn't differ from 'nova list' for undercloud
-        table = runUndercloudCommand(child, 'nova list --all-tenants', '/root/stackrc', parseUndercloudNovalist)
+        table = runUndercloudCommand(client, 'nova list --all-tenants', '/root/stackrc', parseUndercloudNovalist)
         #print(str(table))
+        return table
 
-    if COMMAND == COMMAND_OC_NOVALIST:
-        table = runUndercloudCommand(child, 'nova list', '/root/overcloud.stackrc', parseTable)
+    elif COMMAND == COMMAND_OC_NOVALIST:
+        table = runUndercloudCommand(client, 'nova list', '/root/overcloud.stackrc', parseTable)
         if VERBOSE:
             print(str(table))
+        return table
 
-    if COMMAND == COMMAND_OC_NOVALIST_ALLTENANTS:
-        table = runUndercloudCommand(child, 'nova list --all-tenants', '/root/overcloud.stackrc', parseTable)
+    elif COMMAND == COMMAND_OC_NOVALIST_ALLTENANTS:
+        table = runUndercloudCommand(client, 'nova list --all-tenants', '/root/overcloud.stackrc', parseTable)
         if VERBOSE:
             print(str(table))
+        return table
 
-    if COMMAND == COMMAND_INTERACT:
-        child.interact()
+    elif COMMAND == COMMAND_ONALL_NODES:
+        #showClient('client=', client)
+        SEND_COMMANDS = 'hostname; ip a | grep 10.3; ' + OPT_COMMAND_ARGS
+        client.sendline(SEND_COMMANDS)
+        print("Waiting for heat-admin prompt after command '" + OPT_COMMAND_ARGS + "'") # If heat-admin:
+        client.expect('[#\$] ')
+        return client.before
 
-    child.kill(1)
-    sys.exit(0)
+    elif COMMAND == COMMAND_INTERACT:
+        client.interact()
+        return None
 
-def becomeRoot(child):
-    """ FUNCTION DESCRIPTION """
-    child.expect('[#\$] ')
-    child.sendline('sudo su -')
-    waitOnPossibleSudoPasswordPrompt(child, CONFIG['seed_password'])
+    else:
+        die("Unknown command - " + str(COMMAND))
+
+    #client.kill(1)
+    #sys.exit(0)
+
+def becomeRoot(client):
+    """ Become root via 'sudo su -' command """
+    client.expect('[#\$] ')
+    client.sendline('sudo su -')
+    waitOnPossibleSudoPasswordPrompt(client, CONFIG['seed_password'])
     STEP("root@SEEDHOST")
 
 def connectToSeedVM():
-    """ FUNCTION DESCRIPTION """
+    """ Connect to the seedVM (via seedhost, then as root) """
     # via ssh key directly
 
-    child = connectToSeed()
+    client = connectToSeed()
 
-    becomeRoot(child)
-    child.sendline('ssh ' + seed_vm)
-    child.expect('[#\$] ')
+    becomeRoot(client)
+    client.sendline('ssh ' + seed_vm)
+    client.expect('[#\$] ')
     STEP("root@SEED_VM")
-    return child
+    return client
 
 def connectToUndercloud():
-    """ FUNCTION DESCRIPTION """
+    """ Connect to the undercloud node (via seedhost/seedVM) """
     # via ssh key directly
 
-    child = connectToSeedVM()
-    #child.expect ('[#\$] ')
-    child.sendline('ssh heat-admin@' + undercloud)
+    client = connectToSeedVM()
+    #client.expect ('[#\$] ')
+    client.sendline('ssh heat-admin@' + undercloud)
     STEP("heat-admin@UNDERCLOUD")
-    return child
+    return client
 
 def connectToUndercloudAsRoot():
-    """ FUNCTION DESCRIPTION """
+    """ Connect to the undercloud node as root (via seedhost/seedVM) """
 
-    child = connectToUndercloud()
-    becomeRoot(child)
-    return child
+    client = connectToUndercloud()
+    becomeRoot(client)
+    return client
 
 def connectToNode(NODE):
-    """ FUNCTION DESCRIPTION """
+    """ Connect to the specified node """
 
     if NODE == NODE_SEEDHOST:
         pass
     elif NODE == NODE_SEEDHOST_ROOT:
-        child = becomeRoot(child)
+        client = becomeRoot(client)
     elif NODE == NODE_SEEDVM:
-        child = connectToSeedVM()
+        client = connectToSeedVM()
     elif NODE == NODE_UNDERCLOUD:
-        child = connectToUndercloud()
+        client = connectToUndercloud()
     elif NODE == NODE_UNDERCLOUD_ROOT:
          if client_uc_root == None:
              client_uc_root = connectToUndercloudAsRoot()
     else:
         die("NOT IMPLEMENTED NODE")
 
-    return child
+    return client
     
+def enumerateNodes():
+    """ Create a list of all nodes in system based on seed/undercloud + nova list of overcloud """
+    global VERBOSE
+
+    SAVE_verbose = VERBOSE
+    VERBOSE = 0
+    nodes = performCommand(CLIENT_UC_ROOT, COMMAND_UC_NOVALIST)
+    VERBOSE = SAVE_verbose
+
+    NODES = [ NODE_SEEDVM, NODE_UNDERCLOUD_ROOT ]
+    NODE_NAMES = [ 'seedvm', 'undercloud' ]
+
+    OC_NODE_LIST = {}
+    for key, value in nodes.iteritems():
+        login='heat-admin@' + value['ip']
+
+        SKIP_KEY = False
+        if INC_NODES != None:
+            if value['ip'] not in INC_NODES:
+                #print("Skipping: " + str(value['ip']) + " is not in INC_NODES")
+                SKIP_KEY = True
+
+        if EXC_NODES != None:
+            if value['ip'] in EXC_NODES:
+                #print("Skipping: " + str(value['ip']) + " is in EXC_NODES")
+                SKIP_KEY = True
+
+        if not SKIP_KEY:
+            #print("Adding " + str(key) + " to OC_NODE_LIST")
+            OC_NODE_LIST[key] = value
+
+    #print("OC_NODE_LIST={" + str(OC_NODE_LIST) + "}")
+    print("keys OC_NODE_LIST=[" + str(OC_NODE_LIST.keys()) + "]")
+    #die("OK")
+
+    for key, value in OC_NODE_LIST.iteritems():
+        login='heat-admin@' + value['ip']
+
+        SAVE_verbose = VERBOSE
+        VERBOSE = 0
+
+        tempclient = connectToSeedVM()
+        VERBOSE = SAVE_verbose
+
+        DEBUG(0, "Creating client cnxn to " + login + " ...")
+        tempclient.sendline('ssh ' + login)
+        # If heat-admin:
+        print("Waiting for heat-admin prompt")
+        tempclient.expect('[#\$] ')
+        #tempclient.sendline('hostname')
+        #tempclient.expect('[#\$] ')
+        #print(tempclient.before)
+        print("... done")
+        
+        #showClient('tempclient=', tempclient)
+        NODE_NAMES.append(key)
+        NODES.append( tempclient )
+
+    return NODES
+
 ################################################################################
 # Main:
 
@@ -467,13 +584,24 @@ args = parseArgs()
 
 VERBOSE=args.VERBOSE
 
+COMMAND_ONALL_NODES_ARGS=args.COMMAND_ONALL_NODES_ARGS
+
+INC_NODES=args.INC_NODES
+EXC_NODES=args.EXC_NODES
+
 NODES=args.NODES
 if NODES==None:
-    NODES = [ NODE_SEEDHOST ]
+    if COMMAND_ONALL_NODES_ARGS != None:
+        NODES = [ NODE_TO_ENUMERATE ]
+    else:
+        NODES = [ NODE_SEEDHOST ]
 
 COMMANDS=args.COMMANDS
 if COMMANDS == None:
-    COMMANDS  [ COMMAND_INTERACT ]
+    if COMMAND_ONALL_NODES_ARGS != None:
+        COMMANDS = [ COMMAND_ONALL_NODES ]
+    else:
+        COMMANDS = [ COMMAND_INTERACT ]
 
 if args.PLATFORM:
     PLATFORM = args.PLATFORM
@@ -487,10 +615,22 @@ if USE_KEYS:
 seed_vm =    CONFIG['seed_vm']
 undercloud = CONFIG['undercloud']
 
+SAVE_verbose = VERBOSE
+VERBOSE = 0
+print("Creating initial client cnxns to seed/seedVM/undercloud ...")
 CLIENT_SEED    = connectToSeed()
 CLIENT_SEEDVM  = connectToSeedVM()
 CLIENT_UC      = connectToUndercloud()
 CLIENT_UC_ROOT = connectToUndercloudAsRoot()
+VERBOSE = SAVE_verbose
+print("... Done")
+
+if NODES[0] == NODE_TO_ENUMERATE:
+    #NODES = QUIETEN(0, enumerateNodes)
+    SAVE_verbose = VERBOSE
+    VERBOSE = 0
+    NODES = enumerateNodes()
+    VERBOSE = SAVE_verbose
 
 for NODE in NODES:
 
@@ -504,34 +644,42 @@ for NODE in NODES:
 
         elif COMMAND == COMMAND_UC_NOVALIST:
             performCommand(CLIENT_UC_ROOT, COMMAND)
-            die("TODO - UC ONLY")
 
         elif COMMAND == COMMAND_UC_NOVALIST_ALLTENANTS:
             performCommand(CLIENT_UC_ROOT, COMMAND)
-            die("TODO - UC ONLY")
 
         elif COMMAND == COMMAND_OC_NOVALIST:
             performCommand(CLIENT_UC_ROOT, COMMAND)
-            die("TODO - UC ONLY")
     
         elif COMMAND == COMMAND_OC_NOVALIST_ALLTENANTS:
             performCommand(CLIENT_UC_ROOT, COMMAND)
-            die("TODO - UC ONLY")
     
+        elif COMMAND == COMMAND_ONALL_NODES:
+            if NODE == NODE_SEEDVM:
+                CLIENT=CLIENT_SEEDVM
+            elif NODE == NODE_UNDERCLOUD_ROOT:
+                CLIENT=CLIENT_UC_ROOT
+            else:
+                CLIENT=NODE
+
+            cmdop = performCommand(CLIENT, COMMAND, COMMAND_ONALL_NODES_ARGS)
+            print("COMMAND OP='" + str(cmdop) + "'")
+
         elif COMMAND == COMMAND_INTERACT:
+            client.send('print("Hello from seed_host - now over to you!")\n')
+            client.interact()
             die("TODO")
             pass
 
         else:
             die("TODO - untreated command in NODES loop")
 
-#testParseNovaList()
+#testParseTableAndOVNames()
 #testParseTable()
 #die("OK")
 
 
-print(child.after, end='')
-child.send('print("Hello from seed_host - now over to you!")\n')
-
-child.interact()
+#print(client.after, end='')
+#client.send('print("Hello from seed_host - now over to you!")\n')
+#client.interact()
 
