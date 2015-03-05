@@ -30,7 +30,7 @@ import time
 import argparse
 import ConfigParser, os
 
-VERBOSE=0
+VERBOSE = None
 
 platform_config_file='Default.ini'
 
@@ -105,8 +105,25 @@ def TOBE_DONE_QUIETEN(level, FUNCTION, *ARGS):
 
 def DEBUG(level, message):
     """ Print the message if VERBOSE is greater or equal to the specified debug level """
+    #global VERBOSE
+
+    import inspect
+    f = inspect.currentframe().f_back
+    mod = f.f_code.co_filename
+    lineno = f.f_lineno
+    caller = ('%s line %d' % (mod, lineno))
+
+    #p=(VERBOSE >= level)
+    #print(type(VERBOSE), type(level), type(p), str(p))
     if VERBOSE >= level:
-        print(message)
+        if level == 0:
+            print(message)
+        else:
+            print("DEBUG" + str(level) + ": " + message)
+            #print("DEBUG[" + caller + ", " + str(level) + ">=" + str(VERBOSE) + "]: " + message)
+    else:
+        pass
+        #print("_____[" + caller + ", " + str(level) + ">=" + str(VERBOSE) + "]: " + str(len(message)) + " -> '" + message[:40] + "...'")
 
 # TODO: Allow multiple subactions
 COMMAND_SHOW_UNDERCLOUD_PASSWORDS=101
@@ -152,12 +169,12 @@ def parseArgs():
     parser.add_argument('--exc', dest='EXC_NODES', action='append')
 
     args = parser.parse_args()
-    #if args: print(args.accumulate(args.integers))
+    #if args: DEBUG(1, args.accumulate(args.integers))
     return args
 
-def die(msg):
+def FAIL(msg):
     """ Fail and exit """
-    print(msg)
+    print("FAIL: " + msg)
     sys.exit(1)
 
 def readConfig(section):
@@ -183,7 +200,7 @@ def readConfig(section):
     return CFG
 
 def showClient(label, client):
-    print(label, str(client).split('\n')[0])
+    DEBUG(0, label + str(client).split('\n')[0])
 
 def waitOnPossibleSudoPasswordPrompt(client, password):
     """ Check if password prompt from sudo, if so send password and wait for shell prompt """
@@ -195,27 +212,10 @@ def waitOnPossibleSudoPasswordPrompt(client, password):
         #STEP("sent password/waiting on prompt")
         client.expect('root.*')
         #STEP("GOT prompt")
-        #print("PROMPT <" + client.match.string + ">")
+        #DEBUG(1, "PROMPT <" + client.match.string + ">")
     elif i==1:
-        #print("OK <" + str(client.match.string) + ">")
+        #DEBUG(1, "OK <" + str(client.match.string) + ">")
         pass
-    #waitOnVMRootPrompt()
-
-#client.expect('password:')
-#client.sendline (my_secret_password)
-## We expect any of these three patterns...
-#i = client.expect (['Permission denied', 'Terminal type', '[#\$] '])
-#if i==0:
-#    print 'Permission denied on host. Can't login'
-#    client.kill(0)
-#elif i==2:
-#    print 'Login OK... need to send terminal type.'
-#    client.sendline('vt100')
-#    client.expect ('[#\$] ')
-#elif i==3:
-#    print 'Login OK.'
-#    print 'Shell command prompt', client.after
-#
 
 def connectToSeed():
     """ Create a Pexpect connecton to the seedhost """
@@ -224,24 +224,19 @@ def connectToSeed():
     ssh_passwd_opts=''
     if CONFIG['seed_password'] == '':
         command = '/usr/bin/ssh ' + ssh_passwd_opts + ' ' + CONFIG['seed_login']
-        if VERBOSE:
-            print("Logging in using ssh-keys <" + command + ">")
+        DEBUG(1, "Logging in to seed using ssh-keys <" + command + ">")
         client = pexpect.spawnu(command)
         seen = client.expect('^.+')
         if seen == 0:
-            if VERBOSE:
-                print(client.before)
-            #die("SSH-KEYS: failed to log in to seedhost <" + CONFIG['seed_login'] + "> using ssh-keys")
+            DEBUG(1, client.before)
+            #FAIL("SSH-KEYS: failed to log in to seedhost <" + CONFIG['seed_login'] + "> using ssh-keys")
         STEP("SEEDHOST")
         return client
 
     #ssh_passwd_opts='-o PreferredAuthentications=keyboard-interactive -o PubkeyAuthentication=no'
     ssh_passwd_opts='-o PubkeyAuthentication=no'
-    if VERBOSE:
-        print("Logging in using user entered password")
     command = '/usr/bin/ssh ' + ssh_passwd_opts + ' ' + CONFIG['seed_login']
-    if VERBOSE:
-        print("Logging in using password <" + command + ">")
+    DEBUG(1, "Logging in to seed using password <" + command + ">")
     client = pexpect.spawnu(command)
     # user@10.3.160.10's password:
     #seen = client.expect('.+s password:')
@@ -249,35 +244,32 @@ def connectToSeed():
         seen = client.expect('password:', timeout=10)
         #i = client.expect ([pattern1, pattern2, pattern3, etc])
     except Exception as e:
-        if VERBOSE:
-            print("Expected password prompt - timed out on command (" + command + ")")
-            print("Exception was thrown, debug information:")
-            print(str(e))
-        else:
-            print("Expected password prompt - timed out on command (" + command + ")")
+        DEBUG(1, "Expected password prompt - timed out on command (" + command + ")")
+        DEBUG(2, "Exception was thrown, debug information:")
+        DEBUG(2, str(e))
 
-        # ?? print(str(client))
+        # ?? DEBUG(1, str(client))
         # It is also useful to log the client's input and out to a file or the screen.
         # The following will turn on logging and send output to stdout (the screen).
         #client = pexpect.spawn (foo)
         #client.logfile = sys.stdout
         sys.exit(1)
 
-    #if VERBOSE: print("SEEN=" + str(seen))
+    #if VERBOSE: DEBUG(1, "SEEN=" + str(seen))
     if seen == 0:
-        if VERBOSE: print(client.before)
-        #die("PASSWORD: failed to log in to seedhost <" + CONFIG['seed_login'] + "> using password")
+        DEBUG(1, client.before)
+        #FAIL("PASSWORD: failed to log in to seedhost <" + CONFIG['seed_login'] + "> using password")
 
-    if VERBOSE: print("Sending password (contains " + str(len(CONFIG['seed_password'])) + " chars)")
+    DEBUG(1, "Sending password (contains " + str(len(CONFIG['seed_password'])) + " chars)")
     client.sendline(CONFIG['seed_password'])
-    #die("PASSWORD")
+    #FAIL("PASSWORD")
 
     STEP("SEEDHOST")
     return client
 
 def waitOnVMRootPrompt():
     """ Wait for the root@hLinux prompt of the seed VM """
-    print("waiting on VMRoot prompt")
+    DEBUG(1, "waiting on VMRoot prompt")
     #client.expect('root\@hLinux:\~ ')
     client.expect('root@hLinux:~ ')
     
@@ -305,12 +297,12 @@ def parseTable(tableText):
             else:
                 table.append( [ all ] )
                 #table.append( [ all ] )
-            #print("LEN(table)=" + str(len(table)))
-            #print("STR(table)=" + str(table))
+            #DEBUG(1, "LEN(table)=" + str(len(table)))
+            #DEBUG(1, "STR(table)=" + str(table))
 
-    #print("TABLE[0]=<" + str(table[0]) + ">")
-    #print("TABLE[1]=<" + str(table[1]) + ">")
-    #print("TABLE[2]=<" + str(table[2]) + ">")
+    #DEBUG(1, "TABLE[0]=<" + str(table[0]) + ">")
+    #DEBUG(1, "TABLE[1]=<" + str(table[1]) + ">")
+    #DEBUG(1, "TABLE[2]=<" + str(table[2]) + ">")
 
     return table
 
@@ -318,25 +310,25 @@ def testParseTableAndOVNames():
     """ test parseTable and interpretOvercloudNodeNames functions """
     table = parseTable(TEST_STRING)
     nodes = interpretOvercloudNodeNames(table)
-    print("TEST_NODES=" + str(nodes))
+    DEBUG(1, "TEST_NODES=" + str(nodes))
 
 def interpretOvercloudNodeNames(table):
     """ determine logical names, such as swift1, vsa2 etc for overcloud node names """
     nodes = {}
 
-    #print("table[type " + str(type(table)) + "] has " + str(len(table)) + " rows")
-    #print("table[1:][type " + str(type(table[1:])) + "] has " + str(len(table[1:])) + " rows")
+    #DEBUG(1, "table[type " + str(type(table)) + "] has " + str(len(table)) + " rows")
+    #DEBUG(1, "table[1:][type " + str(type(table[1:])) + "] has " + str(len(table[1:])) + " rows")
     for row in table[1:]:
         row=row[0]
-        #print("ROW=" + str(row))
-        #print("row[type " + str(type(row)) + "] has " + str(len(row)) + " elements")
+        #DEBUG(1, "ROW=" + str(row))
+        #DEBUG(1, "row[type " + str(type(row)) + "] has " + str(len(row)) + " elements")
     
         name=row[1]
 
         ip=row[5]
         m = re.compile('ctlplane=(\S+)').match(ip)
         if m == None:
-            die("Failed to find ip address in IP field <" + ip + ">")
+            FAIL("Failed to find ip address in IP field <" + ip + ">")
         ip = m.group(1)
 
         controller_types={
@@ -355,17 +347,15 @@ def interpretOvercloudNodeNames(table):
                 break
      
         if idxname == None:
-            if VERBOSE:
-                print("table[type " + str(type(table)) + "] has " + str(len(table)) + " rows")
-                print("row[type " + str(type(row)) + "] has " + str(len(row)) + " elements")
-                print("ROW=" + str(row))
-            die("Failed to match name <" + name + ">")
+            DEBUG(1, "table[type " + str(type(table)) + "] has " + str(len(table)) + " rows")
+            DEBUG(1, "row[type " + str(type(row)) + "] has " + str(len(row)) + " elements")
+            DEBUG(1, "ROW=" + str(row))
+            FAIL("Failed to match name <" + name + ">")
 
         #nodes[name]=ip
         nodes[idxname]= { 'ip': ip, 'name': name, 'id': id }
 
-    if VERBOSE:
-        print("NODES=" + str(nodes))
+    DEBUG(1, "NODES=" + str(nodes))
     return nodes
 
 def testParseTable():
@@ -395,7 +385,8 @@ def runUndercloudCommand(client, cmd, stackrc, parserFn):
     client.sendline(cmd)
     client.expect ('[#\$] ')
     cmdop = client.before
-    print(cmdop)
+    DEBUG(0, cmdop)
+    #print(cmdop)
     
     if parserFn != None:
         # if 'nova list' in cmd:
@@ -410,44 +401,42 @@ def performCommand(client, COMMAND, OPT_COMMAND_ARGS=None):
         client.sendline('cat /root/tripleo/tripleo-undercloud-passwords')
         client.expect ('[#\$] ')
         passwords = client.before
-        print(passwords)
+        DEBUG(1, passwords)
         return passwords
 
     elif COMMAND == COMMAND_SHOW_OVERCLOUD_PASSWORDS:
         client.sendline('cat /root/tripleo/tripleo-overcloud-passwords')
         client.expect ('[#\$] ')
         passwords = client.before
-        print(passwords)
+        DEBUG(1, passwords)
         return passwords
 
     elif COMMAND == COMMAND_UC_NOVALIST:
         table = runUndercloudCommand(client, 'nova list', '/root/stackrc', parseUndercloudNovalist)
-        #print(str(table))
+        #DEBUG(1, str(table))
         return table
 
     elif COMMAND == COMMAND_UC_NOVALIST_ALLTENANTS:
         # Uninteresting ... shouldn't differ from 'nova list' for undercloud
         table = runUndercloudCommand(client, 'nova list --all-tenants', '/root/stackrc', parseUndercloudNovalist)
-        #print(str(table))
+        #DEBUG(1, str(table))
         return table
 
     elif COMMAND == COMMAND_OC_NOVALIST:
         table = runUndercloudCommand(client, 'nova list', '/root/overcloud.stackrc', parseTable)
-        if VERBOSE:
-            print(str(table))
+        DEBUG(1, str(table))
         return table
 
     elif COMMAND == COMMAND_OC_NOVALIST_ALLTENANTS:
         table = runUndercloudCommand(client, 'nova list --all-tenants', '/root/overcloud.stackrc', parseTable)
-        if VERBOSE:
-            print(str(table))
+        DEBUG(1, str(table))
         return table
 
     elif COMMAND == COMMAND_ONALL_NODES:
         #showClient('client=', client)
         SEND_COMMANDS = 'hostname; ip a | grep 10.3; ' + OPT_COMMAND_ARGS
         client.sendline(SEND_COMMANDS)
-        print("Waiting for heat-admin prompt after command '" + OPT_COMMAND_ARGS + "'") # If heat-admin:
+        DEBUG(1, "Waiting for heat-admin prompt after command '" + OPT_COMMAND_ARGS + "'") # If heat-admin:
         client.expect('[#\$] ')
         return client.before
 
@@ -456,7 +445,7 @@ def performCommand(client, COMMAND, OPT_COMMAND_ARGS=None):
         return None
 
     else:
-        die("Unknown command - " + str(COMMAND))
+        FAIL("Unknown command - " + str(COMMAND))
 
     #client.kill(1)
     #sys.exit(0)
@@ -512,7 +501,7 @@ def connectToNode(NODE):
          if client_uc_root == None:
              client_uc_root = connectToUndercloudAsRoot()
     else:
-        die("NOT IMPLEMENTED NODE")
+        FAIL("NOT IMPLEMENTED NODE")
 
     return client
     
@@ -535,21 +524,21 @@ def enumerateNodes():
         SKIP_KEY = False
         if INC_NODES != None:
             if value['ip'] not in INC_NODES:
-                #print("Skipping: " + str(value['ip']) + " is not in INC_NODES")
+                #DEBUG(1, "Skipping: " + str(value['ip']) + " is not in INC_NODES")
                 SKIP_KEY = True
 
         if EXC_NODES != None:
             if value['ip'] in EXC_NODES:
-                #print("Skipping: " + str(value['ip']) + " is in EXC_NODES")
+                #DEBUG(1, "Skipping: " + str(value['ip']) + " is in EXC_NODES")
                 SKIP_KEY = True
 
         if not SKIP_KEY:
-            #print("Adding " + str(key) + " to OC_NODE_LIST")
+            #DEBUG(1, "Adding " + str(key) + " to OC_NODE_LIST")
             OC_NODE_LIST[key] = value
 
-    #print("OC_NODE_LIST={" + str(OC_NODE_LIST) + "}")
-    print("keys OC_NODE_LIST=[" + str(OC_NODE_LIST.keys()) + "]")
-    #die("OK")
+    #DEBUG(1, "OC_NODE_LIST={" + str(OC_NODE_LIST) + "}")
+    DEBUG(1, "keys OC_NODE_LIST=[" + str(OC_NODE_LIST.keys()) + "]")
+    #FAIL("OK")
 
     for key, value in OC_NODE_LIST.iteritems():
         login='heat-admin@' + value['ip']
@@ -563,12 +552,12 @@ def enumerateNodes():
         DEBUG(0, "Creating client cnxn to " + login + " ...")
         tempclient.sendline('ssh ' + login)
         # If heat-admin:
-        print("Waiting for heat-admin prompt")
+        DEBUG(1, "Waiting for heat-admin prompt")
         tempclient.expect('[#\$] ')
         #tempclient.sendline('hostname')
         #tempclient.expect('[#\$] ')
-        #print(tempclient.before)
-        print("... done")
+        #DEBUG(1, tempclient.before)
+        DEBUG(1, "... done")
         
         #showClient('tempclient=', tempclient)
         NODE_NAMES.append(key)
@@ -580,9 +569,11 @@ def enumerateNodes():
 # Main:
 
 args = parseArgs()
-#print(args)
+#DEBUG(1, args)
 
-VERBOSE=args.VERBOSE
+VERBOSE = args.VERBOSE
+if VERBOSE == None:
+    VERBOSE = 0
 
 COMMAND_ONALL_NODES_ARGS=args.COMMAND_ONALL_NODES_ARGS
 
@@ -617,13 +608,14 @@ undercloud = CONFIG['undercloud']
 
 SAVE_verbose = VERBOSE
 VERBOSE = 0
-print("Creating initial client cnxns to seed/seedVM/undercloud ...")
+DEBUG(0, "Creating initial client cnxns to seed/seedVM/undercloud ...")
 CLIENT_SEED    = connectToSeed()
 CLIENT_SEEDVM  = connectToSeedVM()
 CLIENT_UC      = connectToUndercloud()
 CLIENT_UC_ROOT = connectToUndercloudAsRoot()
 VERBOSE = SAVE_verbose
-print("... Done")
+DEBUG(0, "... Done")
+#FAIL("TEST")
 
 if NODES[0] == NODE_TO_ENUMERATE:
     #NODES = QUIETEN(0, enumerateNodes)
@@ -663,23 +655,23 @@ for NODE in NODES:
                 CLIENT=NODE
 
             cmdop = performCommand(CLIENT, COMMAND, COMMAND_ONALL_NODES_ARGS)
-            print("COMMAND OP='" + str(cmdop) + "'")
+            DEBUG(1, "COMMAND OP='" + str(cmdop) + "'")
 
         elif COMMAND == COMMAND_INTERACT:
-            client.send('print("Hello from seed_host - now over to you!")\n')
+            client.send('echo "Hello from seed_host - now over to you!"\n')
             client.interact()
-            die("TODO")
+            FAIL("TODO")
             pass
 
         else:
-            die("TODO - untreated command in NODES loop")
+            FAIL("TODO - untreated command in NODES loop")
 
 #testParseTableAndOVNames()
 #testParseTable()
-#die("OK")
+#FAIL("OK")
 
 
-#print(client.after, end='')
-#client.send('print("Hello from seed_host - now over to you!")\n')
+#DEBUG(1, client.after, end='')
+#client.send('echo "Hello from seed_host - now over to you!"\n')
 #client.interact()
 
