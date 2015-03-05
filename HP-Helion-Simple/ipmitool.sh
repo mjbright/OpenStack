@@ -17,6 +17,8 @@ STATUS_FILE=$TMP/ipmitool_status.$$
 VERBOSE=1
 VERBOSE=0
 
+# ipmitool -R 12 -N 5 -I lanplus -H <host> -U <user> -P <pass> power 
+
 ################################################################################
 # Functions:
 

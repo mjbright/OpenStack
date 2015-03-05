@@ -9,10 +9,15 @@ CSVFILE=baremetal.csv
 [ ! -f $CSVFILE ] && CSVFILE=/home/user/baremetal.csv
 [ ! -f $CSVFILE ] && CSVFILE=/root/baremetal.csv
 
-STATUS_FILE=$HOME/tmp/ipmitool_status.$$
+TMP=$HOME/tmp/ipmitool_status
+[ ! -d $TMP ] && mkdir -p $TMP
 
-VERBOSE=0
+STATUS_FILE=$TMP/ipmitool_status.$$
+
 VERBOSE=1
+VERBOSE=0
+
+# ipmitool -R 12 -N 5 -I lanplus -H <host> -U <user> -P <pass> power 
 
 ################################################################################
 # Functions:
@@ -55,6 +60,14 @@ doAction() {
         disk=${array[6]}
     
         LOGIN="$LEVEL -U $user -P $pass"
+
+        [ "$ACTION" = "check_ilo_ssh" ] && {
+            [ $VERBOSE -ne 0 ] && echo "ssh ${user}@${NODE} exit"
+            ssh ${user}@${NODE} exit >/dev/null 2>&1
+            echo "ssh ${user}@${NODE} ==> $?"
+            continue # Next in loop
+        }
+
         [ $VERBOSE -ne 0 ] && echo "ipmitool -I lanplus -H $NODE $LOGIN $ACTION"
         [ $DO_CMD -ne 0 ] && {
             OP=$(ipmitool -I lanplus -H $NODE $LOGIN $ACTION);
@@ -70,6 +83,7 @@ DO_CMD=1
 
 while [ ! -z "$1" ];do
     case $1 in
+        -ssh)         ACTION="check_ilo_ssh";;
         -change)      ACTION="status_changes";;
 
         -stat*|stat*) LEVEL="-L USER"; ACTION="power status";;
