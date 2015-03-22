@@ -25,8 +25,8 @@ function yesno
             read resp
         fi
         [ \( "$resp" = "q" \) -o \( "$resp" = "Q" \) ] && exit 0
-        [ \( "$resp" = "y" \) -o \( "$resp" = "Y" \) ] && return 1
-        [ \( "$resp" = "n" \) -o \( "$resp" = "N" \) ] && return 0
+        [ \( "$resp" = "y" \) -o \( "$resp" = "Y" \) ] && return 0
+        [ \( "$resp" = "n" \) -o \( "$resp" = "N" \) ] && return 1
     done
 }
 
@@ -81,7 +81,7 @@ done
 getNovaList $MATCH
 
 [ $YES -eq 0 ] && {
-    yesno "Delete VMs[$VMNAMEs]?" || YES=1;
+    yesno "Delete VMs[$VMNAMEs]?" && YES=1;
     #[ $? -eq 0 ] && { YES=1; }
 }
 
