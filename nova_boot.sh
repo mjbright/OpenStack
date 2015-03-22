@@ -1,24 +1,26 @@
+#!/usr/bin/bash
 
 VERBOSE=1
 
 LOGFILE=/tmp/LAUNCHER.sh.log
 
 exec &> >(tee "$LOGFILE")
-echo "Running nova version: " $(nova --version)
+echo "Running nova version: " $(nova --version 2>&1)
 
 # USER: Used to identify network names ... (TODO: and instances ...)
 USER="MIKE"
 
 # ext-net:
-# NETWORKS="--nic net-id=f7fdbec6-6c18-48ab-af8a-4ec32e61a2d5"
+# NETWORKS_ARG="--nic net-id=f7fdbec6-6c18-48ab-af8a-4ec32e61a2d5"
 
 # default-net:
-NETWORKS="--nic net-id=dcf015a6-001d-4c7a-a07b-a4ab792a44ba"
+NETWORKS_ARG="--nic net-id=dcf015a6-001d-4c7a-a07b-a4ab792a44ba"
 
-INSTANCES=1
-NUM_INSTANCES=""
-[ $INSTANCES -gt 1 ] && NUM_INSTANCES="--num-instances $INSTANCES"
+NUM_NETWORKS=2
 
+NUM_INSTANCES=1
+NUM_INSTANCES_ARG=""
+[ $NUM_INSTANCES -gt 1 ] && NUM_INSTANCES_ARG="--num-instances $NUM_INSTANCES"
 
 ################################################################################
 # Functions:
@@ -156,8 +158,8 @@ imageBoot() {
         --key-name $KEYPAIR_NAME \
         --flavor $FLAVOR \
         $USER_DATA \
-        $NUM_INSTANCES \
-        $NETWORKS \
+        $NUM_INSTANCES_ARG \
+        $NETWORKS_ARG \
         --security-groups default $INSTANCE_NAME | tee $BOOT_INFO_FILE
 
    IMAGE_ID=$(grep -i "^| id " $BOOT_INFO_FILE | awk -F'|' '{ print $3; }')
@@ -265,7 +267,7 @@ TEST0() {
     exit 0
 }
 
-TEST1() {
+TEST1_cirros() {
     chooseCirros
     imageBoot $IMAGE
     getFloatingIP
@@ -273,8 +275,22 @@ TEST1() {
     exit 0
 }
 
-TEST2() {
+TEST2_multiplenetworks() {
     CREATE_TEST_NETWORKS
+    imageBoot $IMAGE
+    getFloatingIP
+    testSSH
+    exit 0
+}
+
+TEST3_JPC() {
+
+    chooseCirros
+
+    NUM_INSTANCES=4; NUM_INSTANCES_ARG="--num-instances $NUM_INSTANCES"
+    NUM_NETWORKS=4
+    CREATE_TEST_NETWORKS
+
     imageBoot $IMAGE
     getFloatingIP
     testSSH
@@ -284,12 +300,13 @@ TEST2() {
 chooseCoreos() {
     IMAGE="coreos"
     FLAVOR=m1.small;
-    DEFAULT_INSTANCE_NAME=cirros;
+    DEFAULT_INSTANCE_NAME=coreos;
     INSTANCE_NAME=$DEFAULT_INSTANCE_NAME;
 
     KEYPAIR_PUB=$HOME/.ssh/coreos_rsa.pub
     KEYPAIR_NAME=coreos
-    USER_LOGIN=coreos # ??
+    #USER_LOGIN=coreos # ??
+    USER_LOGIN=core # ??
 }
 
 chooseCirros() {
@@ -304,22 +321,25 @@ chooseCirros() {
 }
 
 CREATE_TEST_NETWORKS() {
-  neutron ext-list
-
-  #NETWORKS=""
+  OP neutron ext-list
 
   TEST_NETWORK_BASENAME="${USER}TESTNET"
   TEST_SUBNETWORK_BASENAME="${USER}TESTSUBNET"
 
   NETWORK_NAMES=$(neutron net-list | awk '/^\|/ && (NR > 2) {print $4;}')
-  #SUBNETWORK_NAMES=$(neutron subnet-list | awk '/^\|/ && (NR > 2) {print $4;}' | grep -v '^|')
   SUBNETWORK_NAMES=$(neutron subnet-list | awk '/^\|/ && (NR > 2) {print $4;}' | grep -v '^|')
+  echo "Found " $(echo $NETWORK_NAMES    | wc -w) "               networks"
+  echo "Found " $(echo $SUBNETWORK_NAMES | wc -w) "            subnetworks"
+  #echo "Found " $(echo $NETWORK_NAMES    | grep $TEST_NETWORK_BASENAME    | wc -w) "       test    networks matching '$TEST_NETWORK_BASENAME'"
+  #echo "Found " $(echo $SUBNETWORK_NAMES | grep $TEST_SUBNETWORK_BASENAME | wc -w) "       test subnetworks matching '$TEST_SUBNETWORK_BASENAME'"
+
+  NETWORK_NAMES=$(neutron net-list       | awk '/^\|/ && (NR > 2) {print $4;}' | grep $TEST_NETWORK_BASENAME )
+  SUBNETWORK_NAMES=$(neutron subnet-list | awk '/^\|/ && (NR > 2) {print $4;}' | grep -v '^|' | grep $TEST_SUBNETWORK_BASENAME )
+
   #echo "\$NETWORK_NAMES=$NETWORK_NAMES"
   #echo "\$SUBNETWORK_NAMES=$SUBNETWORK_NAMES"
-  echo "Found " $(echo $NETWORK_NAMES    | grep $TEST_NETWORK_BASENAME    | wc -w) "       test    networks matching '$TEST_NETWORK_BASENAME'"
-  echo "Found " $(echo $SUBNETWORK_NAMES | grep $TEST_SUBNETWORK_BASENAME | wc -w) "       test subnetworks matching '$TEST_SUBNETWORK_BASENAME'"
-
-  NUM_NETWORKS=2
+  echo "Found " $(echo $NETWORK_NAMES    | wc -w) "       test    networks matching '$TEST_NETWORK_BASENAME'"
+  echo "Found " $(echo $SUBNETWORK_NAMES | wc -w) "       test subnetworks matching '$TEST_SUBNETWORK_BASENAME'"
 
   for NET in $(seq 1 $NUM_NETWORKS); do
       NETWORK_NAME=${TEST_NETWORK_BASENAME}${NET}
@@ -340,10 +360,10 @@ CREATE_TEST_NETWORKS() {
       NETWORK_ID=$(neutron net-show $NETWORK_NAME | grep " id " | awk '{print $4;}')
       [ -z "$NETWORK_ID" ] && die "Failed to created network <$NETWORK_ID>"
 
-      NETWORKS+=" --nic net-id=$NETWORK_ID"
+      NETWORKS_ARG+=" --nic net-id=$NETWORK_ID"
   done
 
-  #NETWORKS="--nic net-id=TESTNET1 --nic net-id=TESTNET2 --nic net-id=TESTNET3 --nic net-id=TESTNET4"
+  #NETWORKS_ARG="--nic net-id=TESTNET1 --nic net-id=TESTNET2 --nic net-id=TESTNET3 --nic net-id=TESTNET4"
 }
 
 ################################################################################
@@ -371,11 +391,15 @@ while [ ! -z "$1" ];do
         -v*) let VERBOSE=VERBOSE+${#1}-1;;
 
         -TEST0) ACTIONS="TEST0" ;;
-        -TEST1) ACTIONS="TEST1" ;;
-        -TEST2) ACTIONS="TEST2" ;;
+        -TEST1) ACTIONS="TEST1_cirros" ;;
+        -TEST2) ACTIONS="TEST2_multiplenetworks" ;;
+        -TEST3) ACTIONS="TEST3_JPC" ;;
 
         -down) DOWNLOAD=1;;
         -up) UPLOAD=1;;
+
+        -I|--instances)  shift; NUM_INSTANCES=$1; NUM_INSTANCES_ARG="--num-instances $NUM_INSTANCES";;
+        -N|--networks)   shift; NUM_NETWORKS=$1;;
 
         -delete) DELETE_ALL=1;;
 
@@ -404,8 +428,9 @@ done
 for ACTION in $ACTIONS;do
     case $ACTIONS in
         TEST0) TEST0;;
-        TEST1) TEST1;;
-        TEST2) TEST2;;
+        TEST1_cirros) TEST1_cirros;;
+        TEST2_multiplenetworks) TEST2_multiplenetworks;;
+        TEST3_JPC) TEST3_JPC;;
         BOOT) echo BOOT;;
         *) die "Unknown ACTION: $ACTION";;
     esac
