@@ -1,0 +1,28 @@
+#cloud-config
+
+coreos:
+  etcd:
+    # generate a new token for each unique cluster from https://discovery.etcd.io/new
+    discovery: https://discovery.etcd.io/ececb3b485e55f1a30c5bbcc0a28e8eb
+    # multi-region and multi-cloud deployments need to use $public_ipv4
+    addr: $private_ipv4:4001
+    peer-addr: $private_ipv4:7001
+  units:
+    - name: etcd.service
+      command: start
+    - name: fleet.service
+      command: start
+ssh_authorized_keys:
+  # include one or more SSH public keys
+
+
+  units:
+    - name: etcd.service
+      command: start
+    - name: fleet.service
+      command: start
+ssh_authorized_keys:
+  # include one or more SSH public keys
+  - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuwlzNr1fnQwrUVvGT+x7z8IWIdBl2o+VUhR9O7wvIAat0PE9X4pzd+O5kfcFN30RSY+EKHP2QH24PbvF+6rT5H232UX/CcoBJGPhClAX0WuhmASfZIv6bKZlKCf+EWABgk9Z1GwMQOaIs4PxymbMAtzXFDpJjWYS+uD5mJNDtMSESggjBCuJXjiUcN1Yq/GN6vzbBRikvC6FXtbW+kZCmliJhitHfQZGCLbhwG5DEk1d3x6TYl7wsWeu7bHNMuwF6ia4uPuCw1S4fQDU5UURZSGJx7Lbs7k+iU8YCj7P/exJfd1CPq0sMh2sy7bjMRBOJC4+b7UNLxXlxYVZXA48b mjb@mjb-HP-Compaq-8100-Elite-CMT-PC
+
+

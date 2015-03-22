@@ -148,7 +148,7 @@ imageBoot() {
 
     USER_DATA=""
     [ $IMAGE = "coreos" ] && {
-        USER_DATA="--user-data ./cloud-config.yaml";
+        USER_DATA="--user-data ./coreos-config.yaml";
     }
 
     OP nova boot \
@@ -171,7 +171,7 @@ imageBoot() {
 getDiscoveryToken() {
     #curl -w n https://discovery.etcd.io/new
     TOKEN=$(curl -w "\n" https://discovery.etcd.io/new  2>/dev/null | sed 's/.*\///')
-    cp cloud-config.yaml.template c.yaml
+    cp coreos-config.yaml.template c.yaml
     grep token c.yaml 
     sed -ibak "s/<token>/$TOKEN/" c.yaml
     grep token c.yaml
