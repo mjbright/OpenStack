@@ -36,9 +36,19 @@ myexit() {
     exit $1
 }
 
-perlCOMP() {
+perlMATCHic() {
     __TEST="$1" __REGEX="$2" perl -e '
         if ($ENV{__TEST} =~ /$ENV{__REGEX}/i) { exit(0); } else { exit(1); }
+           #{ exit(0); } else { exit(1); }
+           #{ print "$ENV{__TEST} =~ /$ENV{__REGEX}/i\n"; exit(0); } else {
+           #{ print "$ENV{__TEST} !~ /$ENV{__REGEX}/i\n"; exit(1); }
+    '
+    return $?
+}
+
+perlMATCH() {
+    __TEST="$1" __REGEX="$2" perl -e '
+        if ($ENV{__TEST} =~ /$ENV{__REGEX}/) { exit(0); } else { exit(1); }
            #{ exit(0); } else { exit(1); }
            #{ print "$ENV{__TEST} =~ /$ENV{__REGEX}/i\n"; exit(0); } else {
            #{ print "$ENV{__TEST} !~ /$ENV{__REGEX}/i\n"; exit(1); }
@@ -199,13 +209,13 @@ whichFloatingIPFieldForIP() {
     #echo "Nova version: " $(nova --version)
 
     EXP_HEADER=".*Id.*IP.*Server Id.*Fixed IP.*Pool.*"
-    if perlCOMP "$HEADER" "$EXP_HEADER";then
+    if perlMATCHic "$HEADER" "$EXP_HEADER";then
        #echo BINGO on Windows-2.2
        FIELD=4
     else
         #  | Ip | Server Id | Fixed Ip | Pool |
         EXP_HEADER=".*Ip.*Server Id.*Fixed Ip.*Pool.*"
-        if perlCOMP "$HEADER" "$EXP_HEADER";then
+        if perlMATCHic "$HEADER" "$EXP_HEADER";then
            #echo BINGO on Linux-version2.1.7
            FIELD=2
         else
