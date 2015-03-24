@@ -12,10 +12,12 @@ echo "Running nova version: " $(nova --version 2>&1)
 USER="MIKE"
 
 # ext-net:
+DEFAULT_NETWORK_NAME="ext-net"
 # NETWORKS_ARG="--nic net-id=f7fdbec6-6c18-48ab-af8a-4ec32e61a2d5"
 
 # default-net:
-NETWORKS_ARG="--nic net-id=dcf015a6-001d-4c7a-a07b-a4ab792a44ba"
+DEFAULT_NETWORK_NAME="default-net"
+# NETWORKS_ARG="--nic net-id=dcf015a6-001d-4c7a-a07b-a4ab792a44ba"
 
 NUM_NETWORKS=2
 
@@ -58,11 +60,22 @@ function yesno {
 }
 
 function prompt {
-    echo $*
+    [ ! -z "$1" ] && echo $*
     [ $PROMPTS -eq 0 ] && return 1
     echo "Press <return> to continue"
     read resp
     [ \( "$resp" = "q" \) -o \( "$resp" = "Q" \) ] && exit 0
+}
+
+function findDefaultNetwork {
+    MATCH=$1
+    #neutron net-list | grep -iE "default-net|ext-net" | head -1 | awk '{print $2;}'
+    NET_ID=$(neutron net-list | grep -iE $MATCH | head -1 | awk '{print $2;}')
+
+    [ -z "$NET_ID" ] && die "Failed to find network for < $MATCH >"
+    echo "Found network <$NET_ID> matching < $MATCH >"
+
+    NETWORKS_ARG="--nic net-id=$NET_ID"
 }
 
 function perlMATCHic {
@@ -86,8 +99,8 @@ function perlMATCH {
 }
 
 function OP {
-    [ $VERBOSE -ne 0 ] && echo "DEBUG: $*"
-    prompt
+    #[ $VERBOSE -ne 0 ] && echo "DEBUG: $*"
+    echo; prompt "COMMAND: $*"
     $*
     RET=$?
     #[ $VERBOSE -ne 0 ] && echo "VERBOSE=$VERBOSE"
@@ -167,7 +180,11 @@ function imageBoot {
     IMAGE=$1; shift;
 
     IMAGE_ID=$(glance image-list | grep $IMAGE | getTableField 1 1)
-    echo "COREOS uuid=$IMAGE_ID"
+    [ -z "$IMAGE_ID" ] && {
+        IMAGE_ID=$(glance image-list | grep -i $IMAGE | getTableField 1 1)
+    }
+    [ -z "$IMAGE_ID" ] && die "Failed to find available image for <$IMAGE>"
+    echo "IMAGE[$IMAGE] uuid=$IMAGE_ID"
 
     OP nova keypair-list # >/dev/null 2>&1
 
@@ -291,6 +308,8 @@ function testSSH {
 
     #echo "echo yes | $SSH uptime"
     # set -x
+    echo
+    prompt "About to run command: $SSH uptime"
     echo yes | $SSH uptime
 
     if [ $IMAGE = "coreos" ];then
@@ -427,6 +446,7 @@ TEST_SSH=0
 [ -z "$1" ] && set -- -v -image coreos -boot -fip -ssh
 
 chooseCoreos
+findDefaultNetwork " $DEFAULT_NETWORK_NAME "
 
 while [ ! -z "$1" ];do
     case $1 in
