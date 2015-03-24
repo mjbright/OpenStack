@@ -1,6 +1,7 @@
 #!/usr/bin/bash
 
 VERBOSE=1
+PROMPTS=0
 
 LOGFILE=/tmp/LAUNCHER.sh.log
 
@@ -25,18 +26,46 @@ NUM_INSTANCES_ARG=""
 ################################################################################
 # Functions:
 
-die() {
+function die {
     echo "die: $0 - $*" >&2
     myexit 1
 }
 
-myexit() {
+function myexit {
     SAVED_LOGFILE=${LOGFILE}_$(date +%Y%m%d_%H%M%S)
     echo "Logged output to '$SAVED_LOGFILE'" >&2
     exit $1
 }
 
-perlMATCHic() {
+function yesno {
+    resp=""
+    default=""
+    [ ! -z "$2" ] && default="$2"
+
+    while [ 1 ]; do
+        if [ ! -z "$default" ];then
+            echo -n "$1 [yYnNqQ] [$default]:"
+            read resp
+            [ -z "$resp" ] && resp="$default"
+        else
+            echo -n "$1 [yYnNqQ]:"
+            read resp
+        fi
+        [ \( "$resp" = "q" \) -o \( "$resp" = "Q" \) ] && exit 0
+        [ \( "$resp" = "y" \) -o \( "$resp" = "Y" \) ] && return 0
+        [ \( "$resp" = "n" \) -o \( "$resp" = "N" \) ] && return 1
+    done
+}
+
+function prompt {
+    echo $*
+    [ $PROMPTS -eq 0 ] && return 1
+    echo "Press <return> to continue"
+    read resp
+    [ \( "$resp" = "q" \) -o \( "$resp" = "Q" \) ] && exit 0
+}
+
+function perlMATCHic {
     __TEST="$1" __REGEX="$2" perl -e '
         if ($ENV{__TEST} =~ /$ENV{__REGEX}/i) { exit(0); } else { exit(1); }
            #{ exit(0); } else { exit(1); }
@@ -46,7 +75,7 @@ perlMATCHic() {
     return $?
 }
 
-perlMATCH() {
+function perlMATCH {
     __TEST="$1" __REGEX="$2" perl -e '
         if ($ENV{__TEST} =~ /$ENV{__REGEX}/) { exit(0); } else { exit(1); }
            #{ exit(0); } else { exit(1); }
@@ -56,8 +85,9 @@ perlMATCH() {
     return $?
 }
 
-OP() {
+function OP {
     [ $VERBOSE -ne 0 ] && echo "DEBUG: $*"
+    prompt
     $*
     RET=$?
     #[ $VERBOSE -ne 0 ] && echo "VERBOSE=$VERBOSE"
@@ -66,13 +96,13 @@ OP() {
     [ $RET -ne 0 ] && die "Returned $RET: $*"
 }
 
-DELETE_ALL_MATCHING() {
+function DELETE_ALL_MATCHING {
     MATCH=$1; shift;
 
     OP nova delete $(nova list | grep $MATCH | awk -F'|' '{print $2;}')
 }
 
-getTableRow() {
+function getTableRow {
     ROW=$1; shift # Counting 1 as 1st table entry
     #let ROW=ROW+1
 
@@ -89,7 +119,7 @@ getTableRow() {
     #grep "^|" | head -$ROW | tail -1
 }
 
-getTableField() {
+function getTableField {
     ROW=$1;   shift # Counting 1 as 1st table entry
     FIELD=$1; shift # Counting 1 as 1st field
     #let ROW=ROW+1
@@ -112,18 +142,18 @@ getTableField() {
 ################################################################################
 # Other functions:
 
-downloadAlphaCoreOS() {
+function downloadAlphaCoreOS {
     wget http://alpha.release.core-os.net/amd64-usr/current/coreos_production_openstack_image.img.bz2
     bunzip2 coreos_production_openstack_image.img.bz2
 }
 
-glanceCreate() {
+function glanceCreate {
     [ $IMAGE != "coreos" ] && die "Not implemented yet for image '$IMAGE'"
 
     glanceCoreOSCreate
 }
 
-glanceCoreOSCreate() {
+function glanceCoreOSCreate {
     OP glance image-create --name coreos \
       --container-format bare \
       --disk-format qcow2 \
@@ -133,7 +163,7 @@ glanceCoreOSCreate() {
     OP glance image-list
 }
 
-imageBoot() {
+function imageBoot {
     IMAGE=$1; shift;
 
     IMAGE_ID=$(glance image-list | grep $IMAGE | getTableField 1 1)
@@ -180,7 +210,7 @@ imageBoot() {
    set +x
 }
 
-getDiscoveryToken() {
+function getDiscoveryToken {
     #curl -w n https://discovery.etcd.io/new
     TOKEN=$(curl -w "\n" https://discovery.etcd.io/new  2>/dev/null | sed 's/.*\///')
     cp coreos-config.yaml.template c.yaml
@@ -189,7 +219,7 @@ getDiscoveryToken() {
     grep token c.yaml
 }
 
-waitOnPort() {
+function waitOnPort {
     HOST=$1; shift;
     PORT=$1; shift;
 
@@ -202,7 +232,7 @@ waitOnPort() {
     done
 }
 
-whichFloatingIPFieldForIP() {
+function whichFloatingIPFieldForIP {
     HEADER="$1"; shift
     FIELD=0
 
@@ -224,7 +254,7 @@ whichFloatingIPFieldForIP() {
     fi
 }
 
-getFloatingIP() {
+function getFloatingIP {
     #FREE_IP=$(nova floating-ip-list | grep ext-net | grep " - " | head -1 | awk '{ print $2;}');
     #FREE_IP=$(nova floating-ip-list | grep ext-net | grep " - " | head -1 | awk '{ print $4;}');
 
@@ -251,7 +281,7 @@ getFloatingIP() {
     OP nova list | grep $IMAGE_ID
 }
 
-testSSH() {
+function testSSH {
     waitOnPort $FREE_IP 22
     ssh-keygen -f "$HOME/.ssh/known_hosts" -R ${FREE_IP}
 
@@ -272,14 +302,14 @@ testSSH() {
     fi
 }
 
-TEST0() {
+function TEST0 {
     imageBoot $IMAGE
     getFloatingIP
     testSSH
     exit 0
 }
 
-TEST1_cirros() {
+function TEST1_cirros {
     chooseCirros
     imageBoot $IMAGE
     getFloatingIP
@@ -287,7 +317,7 @@ TEST1_cirros() {
     exit 0
 }
 
-TEST2_multiplenetworks() {
+function TEST2_multiplenetworks {
     CREATE_TEST_NETWORKS
     imageBoot $IMAGE
     getFloatingIP
@@ -295,7 +325,7 @@ TEST2_multiplenetworks() {
     exit 0
 }
 
-TEST3_JPC() {
+function TEST3_JPC {
 
     chooseCirros
 
@@ -309,7 +339,7 @@ TEST3_JPC() {
     exit 0
 }
 
-chooseCoreos() {
+function chooseCoreos {
     IMAGE="coreos"
     FLAVOR=m1.small;
     DEFAULT_INSTANCE_NAME=coreos;
@@ -321,7 +351,7 @@ chooseCoreos() {
     USER_LOGIN=core # ??
 }
 
-chooseCirros() {
+function chooseCirros {
     IMAGE="cirros";
     FLAVOR=m1.tiny;
     DEFAULT_INSTANCE_NAME=cirros;
@@ -332,7 +362,7 @@ chooseCirros() {
     USER_LOGIN=cirros
 }
 
-CREATE_TEST_NETWORKS() {
+function CREATE_TEST_NETWORKS {
   OP neutron ext-list
 
   TEST_NETWORK_BASENAME="${USER}TESTNET"
@@ -409,6 +439,8 @@ while [ ! -z "$1" ];do
 
         -down) DOWNLOAD=1;;
         -up) UPLOAD=1;;
+
+        -demo) PROMPTS=1;;
 
         -I|--instances)  shift; NUM_INSTANCES=$1; NUM_INSTANCES_ARG="--num-instances $NUM_INSTANCES";;
         -N|--networks)   shift; NUM_NETWORKS=$1;;
