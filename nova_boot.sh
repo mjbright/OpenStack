@@ -190,6 +190,7 @@ function glanceCoreOSCreate {
 function imageBoot {
     IMAGE=$1; shift;
 
+    OP glance image-list
     IMAGE_ID=$(glance image-list | grep $IMAGE | getTableField 1 1)
     [ -z "$IMAGE_ID" ] && {
         IMAGE_ID=$(glance image-list | grep -i $IMAGE | getTableField 1 1)
@@ -393,7 +394,7 @@ function chooseCirros {
 }
 
 function CREATE_TEST_NETWORKS {
-  OP neutron ext-list
+  # OP neutron ext-list
 
   TEST_NETWORK_BASENAME="${USER}TESTNET"
   TEST_SUBNETWORK_BASENAME="${USER}TESTSUBNET"
