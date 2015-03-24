@@ -199,7 +199,7 @@ function imageBoot {
 
     OP nova keypair-list # >/dev/null 2>&1
 
-    OP nova keypair-list | grep $KEYPAIR_NAME && {
+    nova keypair-list | grep -q $KEYPAIR_NAME && {
         echo "$KEYPAIR_NAME keypair already installed";
     } || {
         pushd ~/.ssh/
@@ -210,7 +210,7 @@ function imageBoot {
 
     BOOT_INFO_FILE=/tmp/imageBoot.$$
 
-    OP nova list | grep $DEFAULT_INSTANCE_NAME && {
+    nova list | grep $DEFAULT_INSTANCE_NAME && {
 	INSTANCE_NAME=${DEFAULT_INSTANCE_NAME}_$(date +%Y%m%d_%H%M%S)
     }
     echo INSTANCE_NAME=$INSTANCE_NAME
@@ -300,13 +300,13 @@ function getFloatingIP {
     ## echo "USE field $FIELD"
 
     FREE_IP=$(nova floating-ip-list | grep ext-net | grep " - " | head -1 | awk "{ print \$$FIELD;}");
-    echo "IMAGE_ID=$IMAGE_ID"
+    #echo "IMAGE_ID=$IMAGE_ID"
     echo "FREE_IP=$FREE_IP"
     #die "TO FIX - same on Windows and Linux????"
     OP nova list
     OP nova floating-ip-associate $IMAGE_ID $FREE_IP
-    OP nova keypair-list
-    OP nova list | grep $IMAGE_ID
+    #OP nova keypair-list
+    nova list | grep $IMAGE_ID
 }
 
 function testSSH {
