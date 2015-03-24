@@ -254,20 +254,22 @@ getFloatingIP() {
 testSSH() {
     waitOnPort $FREE_IP 22
     ssh-keygen -f "$HOME/.ssh/known_hosts" -R ${FREE_IP}
-    SCP="scp -i $KEYPAIR_PUB"
-    SSH="ssh -i $KEYPAIR_PUB ${USER_LOGIN}@${FREE_IP}"
 
-    #ssh -oStrictHostKeyChecking=no -i $KEYPAIR_PUB ${USER_LOGIN}@${FREE_IP} uptime
-    #echo "echo yes | ssh -i $KEYPAIR_PUB ${USER_LOGIN}@${FREE_IP} uptime"
-    #echo yes | ssh -i $KEYPAIR_PUB ${USER_LOGIN}@${FREE_IP} uptime
-    echo "echo yes | $SSH uptime"
-    set -x
+    KEYPAIR_FILE=${KEYPAIR_PUB%.pub}
+    SCP="scp -oStrictHostKeyChecking=no -i $KEYPAIR_FILE"
+    SSH="ssh -oStrictHostKeyChecking=no -i $KEYPAIR_FILE ${USER_LOGIN}@${FREE_IP}"
+
+    #echo "echo yes | $SSH uptime"
+    # set -x
     echo yes | $SSH uptime
-    $SCP local.etc.resolv.conf ${USER_LOGIN}@${FREE_IP}:/tmp/resolv.conf.local
-    $SSH "cd /etc; [ ! -f resolve.conf.bak ] && { sudo cp resolv.conf resolv.conf.bak; sudo cp /tmp/resolv.conf.local resolv.conf; }"
-    $SSH "cd /etc; cat resolv.conf; ls -altr /etc/resolv.conf"
-    $SSH "ping -w 1 -c 1 www.google.com; docker search hadoop"
-    $SSH "docker ps -a; docker run -it base bash; bash"
+
+    if [ $IMAGE = "coreos" ];then
+        $SCP local.etc.resolv.conf ${USER_LOGIN}@${FREE_IP}:/tmp/resolv.conf.local
+        $SSH "cd /etc; [ ! -f resolve.conf.bak ] && { sudo cp resolv.conf resolv.conf.bak; sudo cp /tmp/resolv.conf.local resolv.conf; }"
+        $SSH "cd /etc; cat resolv.conf; ls -altr /etc/resolv.conf"
+        $SSH "ping -w 1 -c 1 www.google.com; docker search hadoop"
+        $SSH "docker ps -a; docker run -it base bash; bash"
+    fi
 }
 
 TEST0() {
