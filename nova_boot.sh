@@ -67,6 +67,17 @@ function prompt {
     [ \( "$resp" = "q" \) -o \( "$resp" = "Q" \) ] && exit 0
 }
 
+function findNetwork {
+    MATCH=$1
+    #neutron net-list | grep -iE "default-net|ext-net" | head -1 | awk '{print $2;}'
+    NET_ID=$(neutron net-list | grep -iE $MATCH | head -1 | awk '{print $2;}')
+
+    [ -z "$NET_ID" ] && die "Failed to find network for < $MATCH >"
+    echo "Found network <$NET_ID> matching < $MATCH >"
+
+    NETWORKS_ARG+=" --nic net-id=$NET_ID"
+}
+
 function findDefaultNetwork {
     MATCH=$1
     #neutron net-list | grep -iE "default-net|ext-net" | head -1 | awk '{print $2;}'
@@ -464,6 +475,9 @@ while [ ! -z "$1" ];do
 
         -I|--instances)  shift; NUM_INSTANCES=$1; NUM_INSTANCES_ARG="--num-instances $NUM_INSTANCES";;
         -N|--networks)   shift; NUM_NETWORKS=$1;;
+
+        -net) shift; DEFAULT_NETWORK_NAME=$1; findDefaultNetwork " $DEFAULT_NETWORK_NAME ";;
+        +net) shift; NETWORK_NAME=$1; findNetwork " $NETWORK_NAME ";;
 
         -delete) DELETE_ALL=1;;
 
